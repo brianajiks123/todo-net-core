@@ -33,8 +33,8 @@ public static class TodoEndpoints
         // PUT /api/todos/{id}
         group.MapPut("/{id:int}", (int id, UpdateTodoDto dto, TodoService service) =>
         {
-            var success = service.Update(id, dto.Title, dto.IsCompleted);
-            return success ? Results.NoContent() : Results.NotFound();
+            var updated = service.Update(id, dto.Title, dto.IsCompleted);
+            return updated ? Results.NoContent() : Results.NotFound();
         });
 
         // DELETE /api/todos/{id}
