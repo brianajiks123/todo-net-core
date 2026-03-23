@@ -18,6 +18,7 @@ D:\Testing NET\TodoApiNet\TodoApi.Web\obj\Debug\net10.0\TodoApi.Web.AssemblyInfo
 D:\Testing NET\TodoApiNet\TodoApi.Web\obj\Debug\net10.0\TodoApi.Web.csproj.CoreCompileInputs.cache
 D:\Testing NET\TodoApiNet\TodoApi.Web\obj\Debug\net10.0\TodoApi.Web.MvcApplicationPartsAssemblyInfo.cs
 D:\Testing NET\TodoApiNet\TodoApi.Web\obj\Debug\net10.0\TodoApi.Web.MvcApplicationPartsAssemblyInfo.cache
+D:\Testing NET\TodoApiNet\TodoApi.Web\obj\Debug\net10.0\TodoApi.Web.sourcelink.json
 D:\Testing NET\TodoApiNet\TodoApi.Web\obj\Debug\net10.0\rjimswa.dswa.cache.json
 D:\Testing NET\TodoApiNet\TodoApi.Web\obj\Debug\net10.0\rjsmrazor.dswa.cache.json
 D:\Testing NET\TodoApiNet\TodoApi.Web\obj\Debug\net10.0\rjsmcshtml.dswa.cache.json
