@@ -20,7 +20,12 @@ public static class TodoEndpoints
             var todo = service.GetById(id);
             return todo is not null
                 ? Results.Ok(todo)
-                : Results.NotFound();
+                : Results.Problem(
+                    detail: $"Todo dengan ID {id} tidak ditemukan.",
+                    statusCode: StatusCodes.Status404NotFound,
+                    title: "Not Found",
+                    type: "https://httpstatuses.com/404"
+            );
         });
 
         // POST /api/todos
@@ -41,7 +46,13 @@ public static class TodoEndpoints
         group.MapDelete("/{id:int}", (int id, TodoService service) =>
         {
             var deleted = service.Delete(id);
-            return deleted ? Results.NoContent() : Results.NotFound();
+            return deleted 
+                ? Results.NoContent() 
+                : Results.Problem(
+                    detail: $"Todo dengan ID {id} tidak ditemukan.",
+                    statusCode: StatusCodes.Status404NotFound,
+                    title: "Not Found"
+            );
         });
     }
 }
