@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Http.HttpResults;
+using Microsoft.AspNetCore.Mvc;
 using TodoApi.Web.Features.Todos;
 
 namespace TodoApi.Web;
@@ -8,11 +9,14 @@ public static class TodoEndpoints
     public static void MapTodoEndpoints(this IEndpointRouteBuilder routes)
     {
         var group = routes.MapGroup("/todos")
-                         .WithTags("Todos");
+        .WithTags("Todos");
 
         // GET /api/todos
-        group.MapGet("/", (TodoService service)
-            => Results.Ok(service.GetAll()));
+        group.MapGet("/", ([AsParameters] TodoQueryParams query, TodoService service) =>
+        {
+            var result = service.GetPaged(query);
+            return Results.Ok(result);
+        });
 
         // GET /api/todos/{id}
         group.MapGet("/{id:int}", (int id, TodoService service) =>
