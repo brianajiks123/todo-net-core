@@ -48,5 +48,19 @@ Thumbs.db
 desktop.ini
 
 # DB
-**/todos.db
-**/Migrations/
+*.db
+*.db-shm
+*.db-wal
+
+# Test results & coverage
+TestResults/
+coverage/
+*.coverage
+*.coveragexml
+*.trx
+
+# dotnet tools
+.config/dotnet-tools.json
+
+# Migrations (uncomment if you want to exclude)
+# **/Migrations/
