@@ -82,4 +82,10 @@ public class TodoRepository : ITodoRepository
             TotalPages = (int)Math.Ceiling(totalItems / (double)size)
         };
     }
+
+    public async Task<bool> ExistsWithTitleAsync(string title, CancellationToken ct = default)
+    {
+        return await _context.Todos
+            .AnyAsync(t => t.Title.Trim().ToLower() == title.Trim().ToLower(), ct);
+    }
 }

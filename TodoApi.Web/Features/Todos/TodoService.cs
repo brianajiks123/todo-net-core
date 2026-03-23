@@ -1,12 +1,16 @@
+using AutoMapper;
+
 namespace TodoApi.Web.Features.Todos;
 
 public class TodoService
 {
     private readonly IUnitOfWork _unitOfWork;
+    private readonly IMapper _mapper;
 
-    public TodoService(IUnitOfWork unitOfWork)
+    public TodoService(IUnitOfWork unitOfWork, IMapper mapper)
     {
         _unitOfWork = unitOfWork;
+        _mapper = mapper;
     }
 
     public async Task<List<Todo>> GetAll() 
@@ -17,7 +21,9 @@ public class TodoService
 
     public async Task<Todo> Create(string title)
     {
-        var todo = new Todo(title);
+        var dto = new CreateTodoDto(title.Trim());
+        var todo = _mapper.Map<Todo>(dto);
+
         await _unitOfWork.Todos.AddAsync(todo);
         await _unitOfWork.SaveChangesAsync();
         return todo;
