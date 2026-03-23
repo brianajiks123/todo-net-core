@@ -1,0 +1,48 @@
+## .NET / ASP.NET Core
+
+# Build output
+**/bin/
+**/obj/
+
+# NuGet packages
+*.nupkg
+*.snupkg
+.nuget/
+packages/
+
+# User-specific files
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Visual Studio
+.vs/
+*.rsuser
+
+# Rider
+.idea/
+*.DotSettings.user
+
+# VS Code
+.vscode/
+
+# Publish output
+publish/
+**/publish/
+
+# Runtime & logs
+*.log
+*.tmp
+*.temp
+
+# Environment / secrets
+appsettings.*.local.json
+*.env
+.env
+secrets.json
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
