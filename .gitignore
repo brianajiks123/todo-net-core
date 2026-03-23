@@ -46,3 +46,7 @@ secrets.json
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# DB
+**/todos.db
+**/Migrations/

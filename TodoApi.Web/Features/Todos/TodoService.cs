@@ -1,22 +1,57 @@
+using Microsoft.EntityFrameworkCore;
+
 namespace TodoApi.Web.Features.Todos;
 
 public class TodoService
 {
-    private readonly List<Todo> _todos = new()
-    {
-        new Todo(1, "Buy milk"),
-        new Todo(2, "Call mom", true),
-        new Todo(3, "Meeting with team", false, DateTime.UtcNow.AddDays(-2)),
-        new Todo(4, "Finish report", true),
-        new Todo(5, "Buy groceries", false),
-        new Todo(6, "Call dad", false),
-    };
+    private readonly TodoDbContext _context;
 
-    private int _nextId = 7;
-
-    public PagedResult<Todo> GetPaged(TodoQueryParams query)
+    public TodoService(TodoDbContext context)
     {
-        var todos = _todos.AsQueryable();
+        _context = context;
+    }
+
+    public async Task<List<Todo>> GetAll() => await _context.Todos.ToListAsync();
+
+    public async Task<Todo?> GetById(int id) => await _context.Todos.FindAsync(id);
+
+    public async Task<Todo> Create(string title)
+    {
+        var todo = new Todo(title);
+        _context.Todos.Add(todo);
+        await _context.SaveChangesAsync();
+        return todo;
+    }
+
+    public async Task<bool> Update(int id, string? title, bool? isCompleted)
+    {
+        var todo = await GetById(id);
+        if (todo is null) return false;
+
+        if (title is not null) todo.Title = title.Trim();
+        if (isCompleted.HasValue) todo.IsCompleted = isCompleted.Value;
+
+        if (string.IsNullOrWhiteSpace(todo.Title))
+            return false;
+
+        await _context.SaveChangesAsync();
+        return true;
+    }
+
+    public async Task<bool> Delete(int id)
+    {
+        var todo = await GetById(id);
+        if (todo is null) return false;
+
+        _context.Todos.Remove(todo);
+        await _context.SaveChangesAsync();
+        return true;
+    }
+
+    // Pagination
+    public async Task<PagedResult<Todo>> GetPaged(TodoQueryParams query)
+    {
+        var todos = _context.Todos.AsQueryable();
 
         // Filtering: search by title (case-insensitive)
         if (!string.IsNullOrWhiteSpace(query.Search))
@@ -34,27 +69,19 @@ public class TodoService
 
             todos = field switch
             {
-                "title" => direction == "desc"
-                    ? todos.OrderByDescending(t => t.Title)
-                    : todos.OrderBy(t => t.Title),
-                "createdat" => direction == "desc"
-                    ? todos.OrderByDescending(t => t.CreatedAt)
-                    : todos.OrderBy(t => t.CreatedAt),
-                "iscompleted" => direction == "desc"
-                    ? todos.OrderByDescending(t => t.IsCompleted)
-                    : todos.OrderBy(t => t.IsCompleted),
-                _ => todos.OrderByDescending(t => t.CreatedAt) // default
+                "title" => direction == "desc" ? todos.OrderByDescending(t => t.Title) : todos.OrderBy(t => t.Title),
+                "createdat" => direction == "desc" ? todos.OrderByDescending(t => t.CreatedAt) : todos.OrderBy(t => t.CreatedAt),
+                "iscompleted" => direction == "desc" ? todos.OrderByDescending(t => t.IsCompleted) : todos.OrderBy(t => t.IsCompleted),
+                _ => todos.OrderByDescending(t => t.CreatedAt)
             };
         }
         else
         {
-            // Default sort: newest first
             todos = todos.OrderByDescending(t => t.CreatedAt);
         }
 
-        var totalItems = todos.Count();
+        var totalItems = await todos.CountAsync();
 
-        // Pagination
         var page = query.Page ?? 1;     // default 1 if null
         var size = query.Size ?? 10;    // default 10 if null
 
@@ -62,7 +89,8 @@ public class TodoService
         size = Math.Clamp(size, 1, 50);
 
         var skip = (page - 1) * size;
-        var items = todos.Skip(skip).Take(size).ToList();
+
+        var items = await todos.Skip(skip).Take(size).ToListAsync();
 
         return new PagedResult<Todo>
         {
@@ -72,44 +100,5 @@ public class TodoService
             TotalItems = totalItems,
             TotalPages = (int)Math.Ceiling(totalItems / (double)size)
         };
-    }
-
-    public List<Todo> GetAll() => _todos;
-
-    public Todo? GetById(int id) => _todos.Find(t => t.Id == id);
-
-    public Todo Create(string title)
-    {
-        var todo = new Todo(_nextId++, title);
-        _todos.Add(todo);
-        return todo;
-    }
-
-    public bool Update(int id, string? title, bool? isCompleted)
-    {
-        var todo = GetById(id);
-        if (todo is null) return false;
-
-        if (title is not null) title = title.Trim();
-
-        if (string.IsNullOrWhiteSpace(title) && isCompleted is null)
-            return false;
-
-        var updated = todo with
-        {
-            Title = title ?? todo.Title,
-            IsCompleted = isCompleted ?? todo.IsCompleted
-        };
-
-        var index = _todos.IndexOf(todo);
-        _todos[index] = updated;
-        return true;
-    }
-
-    public bool Delete(int id)
-    {
-        var todo = GetById(id);
-        if (todo is null) return false;
-        return _todos.Remove(todo);
     }
 }

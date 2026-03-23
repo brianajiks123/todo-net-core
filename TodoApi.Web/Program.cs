@@ -1,8 +1,10 @@
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using TodoApi.Web;
 using System.Diagnostics;
+using TodoApi.Web.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -11,8 +13,12 @@ var builder = WebApplication.CreateBuilder(args);
 // ────────────────────────────────────────
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
-builder.Services.AddSingleton<TodoService>();  // in-memory storage
 builder.Services.AddValidation();
+
+builder.Services.AddDbContext<TodoDbContext>(options =>
+    options.UseSqlite("Data Source=todos.db"));
+
+builder.Services.AddTodoServices();
 
 // Enable ProblemDetails + Customization Global
 builder.Services.AddProblemDetails(options =>

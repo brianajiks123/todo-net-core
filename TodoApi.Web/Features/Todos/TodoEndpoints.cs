@@ -9,54 +9,52 @@ public static class TodoEndpoints
     public static void MapTodoEndpoints(this IEndpointRouteBuilder routes)
     {
         var group = routes.MapGroup("/todos")
-        .WithTags("Todos");
+            .WithTags("Todos");
 
-        // GET /api/todos
-        group.MapGet("/", ([AsParameters] TodoQueryParams query, TodoService service) =>
-        {
-            var result = service.GetPaged(query);
-            return Results.Ok(result);
-        });
+        // GET /api/todos (pagination + filter + sort)
+        group.MapGet("/", 
+            async ([AsParameters] TodoQueryParams query, 
+                    [FromServices] TodoService service) => 
+            Results.Ok(await service.GetPaged(query)))
+            .WithName("GetTodos")
+            .WithSummary("Daftar todo dengan pagination, search & sorting");
 
         // GET /api/todos/{id}
-        group.MapGet("/{id:int}", (int id, TodoService service) =>
+        group.MapGet("/{id:int}", 
+            async (int id, [FromServices] TodoService service) =>
         {
-            var todo = service.GetById(id);
+            var todo = await service.GetById(id);
             return todo is not null
                 ? Results.Ok(todo)
-                : Results.Problem(
-                    detail: $"Todo dengan ID {id} tidak ditemukan.",
-                    statusCode: StatusCodes.Status404NotFound,
-                    title: "Not Found",
-                    type: "https://httpstatuses.com/404"
-            );
+                : Results.Problem(detail: $"Todo dengan ID {id} tidak ditemukan.", statusCode: 404);
         });
 
         // POST /api/todos
-        group.MapPost("/", (CreateTodoDto dto, TodoService service) =>
+        group.MapPost("/", 
+            async (CreateTodoDto dto, [FromServices] TodoService service) =>
         {
-            var created = service.Create(dto.Title.Trim());
+            var created = await service.Create(dto.Title.Trim());
             return Results.Created($"/api/todos/{created.Id}", created);
         });
 
         // PUT /api/todos/{id}
-        group.MapPut("/{id:int}", (int id, UpdateTodoDto dto, TodoService service) =>
+        group.MapPut("/{id:int}", 
+            async (int id, UpdateTodoDto dto, [FromServices] TodoService service) =>
         {
-            var updated = service.Update(id, dto.Title, dto.IsCompleted);
-            return updated ? Results.NoContent() : Results.NotFound();
+            var success = await service.Update(id, dto.Title, dto.IsCompleted);
+            return success
+                ? Results.NoContent()
+                : Results.Problem(detail: $"Todo dengan ID {id} tidak ditemukan.", statusCode: 404);
         });
 
         // DELETE /api/todos/{id}
-        group.MapDelete("/{id:int}", (int id, TodoService service) =>
+        group.MapDelete("/{id:int}", 
+            async (int id, [FromServices] TodoService service) =>
         {
-            var deleted = service.Delete(id);
-            return deleted 
-                ? Results.NoContent() 
-                : Results.Problem(
-                    detail: $"Todo dengan ID {id} tidak ditemukan.",
-                    statusCode: StatusCodes.Status404NotFound,
-                    title: "Not Found"
-            );
+            var deleted = await service.Delete(id);
+            return deleted
+                ? Results.NoContent()
+                : Results.Problem(detail: $"Todo dengan ID {id} tidak ditemukan.", statusCode: 404);
         });
     }
 }
