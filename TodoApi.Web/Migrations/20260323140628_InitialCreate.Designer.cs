@@ -11,7 +11,7 @@ using TodoApi.Web.Features.Todos;
 namespace TodoApi.Web.Migrations
 {
     [DbContext(typeof(TodoDbContext))]
-    [Migration("20260323132517_InitialCreate")]
+    [Migration("20260323140628_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />

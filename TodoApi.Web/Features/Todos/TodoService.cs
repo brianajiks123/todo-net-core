@@ -1,25 +1,25 @@
-using Microsoft.EntityFrameworkCore;
-
 namespace TodoApi.Web.Features.Todos;
 
 public class TodoService
 {
-    private readonly TodoDbContext _context;
+    private readonly IUnitOfWork _unitOfWork;
 
-    public TodoService(TodoDbContext context)
+    public TodoService(IUnitOfWork unitOfWork)
     {
-        _context = context;
+        _unitOfWork = unitOfWork;
     }
 
-    public async Task<List<Todo>> GetAll() => await _context.Todos.ToListAsync();
+    public async Task<List<Todo>> GetAll() 
+        => await _unitOfWork.Todos.GetAllAsync();
 
-    public async Task<Todo?> GetById(int id) => await _context.Todos.FindAsync(id);
+    public async Task<Todo?> GetById(int id) 
+        => await _unitOfWork.Todos.GetByIdAsync(id);
 
     public async Task<Todo> Create(string title)
     {
         var todo = new Todo(title);
-        _context.Todos.Add(todo);
-        await _context.SaveChangesAsync();
+        await _unitOfWork.Todos.AddAsync(todo);
+        await _unitOfWork.SaveChangesAsync();
         return todo;
     }
 
@@ -34,7 +34,7 @@ public class TodoService
         if (string.IsNullOrWhiteSpace(todo.Title))
             return false;
 
-        await _context.SaveChangesAsync();
+        await _unitOfWork.SaveChangesAsync();
         return true;
     }
 
@@ -43,62 +43,11 @@ public class TodoService
         var todo = await GetById(id);
         if (todo is null) return false;
 
-        _context.Todos.Remove(todo);
-        await _context.SaveChangesAsync();
+        _unitOfWork.Todos.Delete(todo);
+        await _unitOfWork.SaveChangesAsync();
         return true;
     }
 
-    // Pagination
     public async Task<PagedResult<Todo>> GetPaged(TodoQueryParams query)
-    {
-        var todos = _context.Todos.AsQueryable();
-
-        // Filtering: search by title (case-insensitive)
-        if (!string.IsNullOrWhiteSpace(query.Search))
-        {
-            var searchLower = query.Search.Trim().ToLowerInvariant();
-            todos = todos.Where(t => t.Title.ToLowerInvariant().Contains(searchLower));
-        }
-
-        // Sorting
-        if (!string.IsNullOrWhiteSpace(query.Sort))
-        {
-            var parts = query.Sort.Split(':');
-            var field = parts[0].ToLowerInvariant();
-            var direction = parts.Length > 1 && parts[1].ToLowerInvariant() == "desc" ? "desc" : "asc";
-
-            todos = field switch
-            {
-                "title" => direction == "desc" ? todos.OrderByDescending(t => t.Title) : todos.OrderBy(t => t.Title),
-                "createdat" => direction == "desc" ? todos.OrderByDescending(t => t.CreatedAt) : todos.OrderBy(t => t.CreatedAt),
-                "iscompleted" => direction == "desc" ? todos.OrderByDescending(t => t.IsCompleted) : todos.OrderBy(t => t.IsCompleted),
-                _ => todos.OrderByDescending(t => t.CreatedAt)
-            };
-        }
-        else
-        {
-            todos = todos.OrderByDescending(t => t.CreatedAt);
-        }
-
-        var totalItems = await todos.CountAsync();
-
-        var page = query.Page ?? 1;     // default 1 if null
-        var size = query.Size ?? 10;    // default 10 if null
-
-        page = Math.Max(1, page);
-        size = Math.Clamp(size, 1, 50);
-
-        var skip = (page - 1) * size;
-
-        var items = await todos.Skip(skip).Take(size).ToListAsync();
-
-        return new PagedResult<Todo>
-        {
-            Items = items,
-            Page = page,
-            Size = size,
-            TotalItems = totalItems,
-            TotalPages = (int)Math.Ceiling(totalItems / (double)size)
-        };
-    }
+        => await _unitOfWork.Todos.GetPagedAsync(query);
 }

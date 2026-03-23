@@ -7,7 +7,9 @@ public static class ServiceCollectionExtensions
 {
     public static IServiceCollection AddTodoServices(this IServiceCollection services)
     {
+        services.AddScoped<IUnitOfWork, UnitOfWork>();
         services.AddScoped<TodoService>();
+
         return services;
     }
 }
