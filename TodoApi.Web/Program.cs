@@ -2,15 +2,13 @@ using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using TodoApi.Web;
-using System.Diagnostics;
-using TodoApi.Web.Extensions;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
-using System.IdentityModel.Tokens.Jwt;
-using System.Security.Claims;
-using System.Text;
 using Microsoft.OpenApi.Models;
+using TodoApi.Web;
+using TodoApi.Web.Extensions;
+using TodoApi.Web.Features.Auth;
+using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -18,13 +16,6 @@ var builder = WebApplication.CreateBuilder(args);
 // Configuration
 // ────────────────────────────────────────
 var configuration = builder.Configuration;
-
-var jwtSettings = configuration.GetSection("Jwt");
-var jwtSecret = jwtSettings["Secret"] 
-    ?? throw new InvalidOperationException("JWT Secret tidak ditemukan. Set via 'dotnet user-secrets' atau Environment Variable JWT__Secret");
-var jwtIssuer = jwtSettings["Issuer"] ?? "todo-api";
-var jwtAudience = jwtSettings["Audience"] ?? "todo-api";
-var jwtExpirationHours = int.Parse(jwtSettings["ExpirationHours"] ?? "24");
 
 // ────────────────────────────────────────
 // Services
@@ -34,7 +25,6 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
     c.SwaggerDoc("v1", new OpenApiInfo { Title = "Todo API", Version = "v1" });
-
     c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
         In = ParameterLocation.Header,
@@ -44,7 +34,6 @@ builder.Services.AddSwaggerGen(c =>
         BearerFormat = "JWT",
         Scheme = "Bearer"
     });
-
     c.AddSecurityRequirement(new OpenApiSecurityRequirement
     {
         {
@@ -62,40 +51,42 @@ builder.Services.AddSwaggerGen(c =>
 });
 
 builder.Services.AddValidation();
-
 builder.Services.AddDbContext<TodoDbContext>(options =>
     options.UseSqlite("Data Source=todos.db"));
 
 builder.Services.AddTodoServices();
 
+// JWT Authentication
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
+        var jwtSettings = configuration.GetSection("Jwt");
+        var jwtSecret = jwtSettings["Secret"]
+            ?? throw new InvalidOperationException("JWT Secret tidak ditemukan. Set via user-secrets atau environment variable.");
+
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,
             ValidateAudience = true,
             ValidateLifetime = true,
             ValidateIssuerSigningKey = true,
-            ValidIssuer = jwtIssuer,
-            ValidAudience = jwtAudience,
+            ValidIssuer = jwtSettings["Issuer"] ?? "todo-api",
+            ValidAudience = jwtSettings["Audience"] ?? "todo-api",
             IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret))
         };
     });
 
 builder.Services.AddAuthorization();
 
-// Enable ProblemDetails + Customization Global
+// ProblemDetails Customization
 builder.Services.AddProblemDetails(options =>
 {
     options.CustomizeProblemDetails = context =>
     {
-        // Add metadata to all ProblemDetails response
         context.ProblemDetails.Extensions["traceId"] = context.HttpContext.TraceIdentifier;
-        context.ProblemDetails.Extensions["timestamp"] = DateTime.UtcNow.ToString("o"); // ISO 8601
+        context.ProblemDetails.Extensions["timestamp"] = DateTime.UtcNow.ToString("o");
         context.ProblemDetails.Instance = $"{context.HttpContext.Request.Method} {context.HttpContext.Request.Path}{context.HttpContext.Request.QueryString}";
 
-        // Development Mode: add exception type; remove it when production mode
         if (context.HttpContext.RequestServices.GetService<IWebHostEnvironment>()?.IsDevelopment() ?? false)
         {
             if (context.Exception is not null)
@@ -117,7 +108,7 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-// Global Exception Handling → Convert to ProblemDetails
+// Global Exception Handling
 app.UseExceptionHandler(errorApp =>
 {
     errorApp.Run(async context =>
@@ -127,10 +118,8 @@ app.UseExceptionHandler(errorApp =>
 
         if (exception != null)
         {
-            // Log exception in here if has logger
             Console.Error.WriteLine($"Unhandled exception: {exception}");
 
-            // Create ProblemDetails manual for unhandled error
             var problemDetailsService = context.RequestServices.GetRequiredService<IProblemDetailsService>();
             await problemDetailsService.TryWriteAsync(new ProblemDetailsContext
             {
@@ -142,53 +131,55 @@ app.UseExceptionHandler(errorApp =>
                     Detail = app.Environment.IsDevelopment() ? exception.Message : "Terjadi kesalahan. Silakan coba lagi nanti.",
                     Type = "https://httpstatuses.com/500"
                 },
-                Exception = exception // for customization callback
+                Exception = exception
             });
         }
     });
 });
 
-// app.UseHttpsRedirection();   // off when development mode
 app.UseAuthentication();
 app.UseAuthorization();
 
 // ────────────────────────────────────────
-// Auth Endpoint (Login)
+// Auth Endpoints (Register + Login + Refresh)
 // ────────────────────────────────────────
-app.MapGroup("/api/auth")
-   .MapPost("/login", (LoginRequest request) =>
-   {
-       if (request.Username == "admin" && request.Password == "password")
-       {
-           var token = GenerateJwtToken(request.Username, jwtSecret, jwtIssuer, jwtAudience, jwtExpirationHours);
-           return Results.Ok(new { token });
-       }
-       return Results.Unauthorized();
-   });
+var authGroup = app.MapGroup("/api/auth");
 
-string GenerateJwtToken(string username, string secret, string issuer, string audience, int expirationHours)
-{
-    var tokenHandler = new JwtSecurityTokenHandler();
-    var key = Encoding.UTF8.GetBytes(secret);
+authGroup.MapPost("/register",
+    async (RegisterDto dto, [FromServices] AuthService service) =>
+        Results.Ok(await service.RegisterAsync(dto)))
+    .AddEndpointFilter<ValidationFilter<RegisterDto>>()
+    .WithTags("Auth")
+    .WithSummary("Registrasi user baru");
 
-    var tokenDescriptor = new SecurityTokenDescriptor
+authGroup.MapPost("/login",
+    async (LoginDto dto, [FromServices] AuthService service) =>
     {
-        Subject = new ClaimsIdentity(new[] { new Claim(ClaimTypes.Name, username) }),
-        Expires = DateTime.UtcNow.AddHours(expirationHours),
-        Issuer = issuer,
-        Audience = audience,
-        SigningCredentials = new SigningCredentials(
-            new SymmetricSecurityKey(key),
-            SecurityAlgorithms.HmacSha256Signature)
-    };
+        var result = await service.LoginAsync(dto);
+        return result is not null
+            ? Results.Ok(result)
+            : Results.Unauthorized();
+    })
+    .AddEndpointFilter<ValidationFilter<LoginDto>>()
+    .WithTags("Auth")
+    .WithSummary("Login dan dapatkan Access Token + Refresh Token");
 
-    var token = tokenHandler.CreateToken(tokenDescriptor);
-    return tokenHandler.WriteToken(token);
-}
+authGroup.MapPost("/refresh",
+    async (RefreshRequestDto dto, [FromServices] AuthService service) =>
+    {
+        var result = await service.RefreshTokenAsync(dto.RefreshToken);
+        return result is not null
+            ? Results.Ok(result)
+            : Results.Unauthorized();
+    })
+    .AddEndpointFilter<ValidationFilter<RefreshRequestDto>>()
+    .WithTags("Auth")
+    .WithSummary("Refresh Access Token menggunakan Refresh Token");
 
+// ────────────────────────────────────────
+// Todo Endpoints
+// ────────────────────────────────────────
 app.MapGroup("/api")
    .MapTodoEndpoints();
 
 app.Run();
-
-public record LoginRequest(string Username, string Password);

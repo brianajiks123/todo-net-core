@@ -2,6 +2,8 @@ using Microsoft.Extensions.DependencyInjection;
 using TodoApi.Web.Features.Todos;
 using FluentValidation;
 using TodoApi.Web.Features.Todos.Mapping;
+using TodoApi.Web.Features.Auth;
+using TodoApi.Web.Features.Auth.Repositories;
 
 namespace TodoApi.Web.Extensions;
 
@@ -11,6 +13,7 @@ public static class ServiceCollectionExtensions
     {
         services.AddScoped<IUnitOfWork, UnitOfWork>();
         services.AddScoped<TodoService>();
+        services.AddScoped<AuthService>();
         
         services.AddValidatorsFromAssemblyContaining<CreateTodoDtoValidator>();
 
