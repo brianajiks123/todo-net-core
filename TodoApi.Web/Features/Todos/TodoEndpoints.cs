@@ -10,7 +10,8 @@ public static class TodoEndpoints
     public static void MapTodoEndpoints(this IEndpointRouteBuilder routes)
     {
         var group = routes.MapGroup("/todos")
-            .WithTags("Todos");
+            .WithTags("Todos")
+            .RequireAuthorization();
 
         // GET /api/todos (pagination + filter + sort)
         group.MapGet("/", 
