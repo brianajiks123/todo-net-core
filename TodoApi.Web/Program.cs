@@ -21,7 +21,7 @@ var configuration = builder.Configuration;
 
 var jwtSettings = configuration.GetSection("Jwt");
 var jwtSecret = jwtSettings["Secret"] 
-    ?? throw new InvalidOperationException("JWT Secret tidak ditemukan di appsettings.json");
+    ?? throw new InvalidOperationException("JWT Secret tidak ditemukan. Set via 'dotnet user-secrets' atau Environment Variable JWT__Secret");
 var jwtIssuer = jwtSettings["Issuer"] ?? "todo-api";
 var jwtAudience = jwtSettings["Audience"] ?? "todo-api";
 var jwtExpirationHours = int.Parse(jwtSettings["ExpirationHours"] ?? "24");
