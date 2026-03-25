@@ -22,7 +22,7 @@ public class TodoRepository : ITodoRepository
         => _context.Todos.Update(todo);
 
     public void Delete(Todo todo) 
-        => _context.Todos.Remove(todo);
+        => todo.IsDeleted = true;
 
     public async Task<PagedResult<Todo>> GetPagedAsync(TodoQueryParams query, int userId)
     {

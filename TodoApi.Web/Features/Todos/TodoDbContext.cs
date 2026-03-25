@@ -24,6 +24,12 @@ public class TodoDbContext : DbContext
             entity.Property(t => t.CreatedAt).IsRequired();
             entity.Property(t => t.UserId).IsRequired();
 
+            entity.Property(t => t.IsDeleted)
+                .IsRequired()
+                .HasDefaultValue(false);
+
+            entity.HasQueryFilter(t => !t.IsDeleted);
+
             entity.HasOne(t => t.User)
                 .WithMany(u => u.Todos)
                 .HasForeignKey(t => t.UserId)
