@@ -44,10 +44,14 @@ public static class TodoEndpoints
         group.MapPut("/{id:int}", 
             async (int id, UpdateTodoDto dto, [FromServices] TodoService service) =>
         {
-            var success = await service.Update(id, dto.Title?.Trim(), dto.IsCompleted);
-            return success
-                ? Results.NoContent()
-                : Results.Problem(detail: $"Todo dengan ID {id} tidak ditemukan.", statusCode: 404);
+            var result = await service.Update(id, dto.Title?.Trim(), dto.IsCompleted);
+            return result switch
+            {
+                UpdateResult.Success => Results.NoContent(),
+                UpdateResult.NotFound => Results.Problem(detail: $"Todo dengan ID {id} tidak ditemukan.", statusCode: 404),
+                UpdateResult.InvalidTitle => Results.Problem(detail: "Judul tidak boleh kosong.", statusCode: 400),
+                _ => Results.Problem(statusCode: 500)
+            };
         })
         .AddEndpointFilter<ValidationFilter<UpdateTodoDto>>();
 

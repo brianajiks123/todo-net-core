@@ -2,6 +2,8 @@ using AutoMapper;
 
 namespace TodoApi.Web.Features.Todos;
 
+public enum UpdateResult { Success, NotFound, InvalidTitle }
+
 public class TodoService
 {
     private readonly IUnitOfWork _unitOfWork;
@@ -29,19 +31,19 @@ public class TodoService
         return todo;
     }
 
-    public async Task<bool> Update(int id, string? title, bool? isCompleted)
+    public async Task<UpdateResult> Update(int id, string? title, bool? isCompleted)
     {
         var todo = await GetById(id);
-        if (todo is null) return false;
+        if (todo is null) return UpdateResult.NotFound;
 
         if (title is not null) todo.Title = title.Trim();
         if (isCompleted.HasValue) todo.IsCompleted = isCompleted.Value;
 
         if (string.IsNullOrWhiteSpace(todo.Title))
-            return false;
+            return UpdateResult.InvalidTitle;
 
         await _unitOfWork.SaveChangesAsync();
-        return true;
+        return UpdateResult.Success;
     }
 
     public async Task<bool> Delete(int id)

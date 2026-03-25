@@ -1,6 +1,6 @@
 # TodoApi
 
-A simple REST API for todo management built with **ASP.NET Core 10 Minimal API**, **Entity Framework Core**, and **SQLite**. Includes JWT authentication.
+A simple REST API for todo management built with **ASP.NET Core 10 Minimal API**, **Entity Framework Core**, and **SQLite**. Includes JWT authentication with refresh token support.
 
 ---
 
@@ -9,6 +9,7 @@ A simple REST API for todo management built with **ASP.NET Core 10 Minimal API**
 - .NET 10 / ASP.NET Core Minimal API
 - Entity Framework Core 10 + SQLite
 - JWT Bearer Authentication (`Microsoft.AspNetCore.Authentication.JwtBearer`)
+- BCrypt.Net-Next (password hashing)
 - FluentValidation
 - AutoMapper
 - Swashbuckle (Swagger UI)
@@ -18,17 +19,31 @@ A simple REST API for todo management built with **ASP.NET Core 10 Minimal API**
 ```
 TodoApi.Web/
 ├── Features/
+│   ├── Auth/
+│   │   ├── User.cs                        # User entity
+│   │   ├── RefreshToken.cs                # Refresh token entity
+│   │   ├── AuthService.cs                 # Register, login, refresh logic
+│   │   ├── Dtos.cs                        # Auth DTOs (Register, Login, AuthResponse, RefreshRequest)
+│   │   ├── Repositories/
+│   │   │   ├── IUserRepository.cs
+│   │   │   ├── UserRepository.cs
+│   │   │   ├── IRefreshTokenRepository.cs
+│   │   │   └── RefreshTokenRepository.cs
+│   │   └── Validators/
+│   │       ├── LoginDtoValidator.cs
+│   │       ├── RegisterDtoValidator.cs
+│   │       └── RefreshRequestDtoValidator.cs
 │   └── Todos/
-│       ├── Todo.cs                    # Entity model
-│       ├── TodoDbContext.cs           # EF Core DbContext + seed data
-│       ├── TodoService.cs             # Business logic & queries
-│       ├── TodoEndpoints.cs           # Minimal API route handlers
-│       ├── Dtos.cs                    # Request DTOs (Create, Update)
-│       ├── TodoQueryParams.cs         # Query params + PagedResult<T>
+│       ├── Todo.cs                        # Entity model
+│       ├── TodoDbContext.cs               # EF Core DbContext + seed data
+│       ├── TodoService.cs                 # Business logic & queries
+│       ├── TodoEndpoints.cs               # Minimal API route handlers
+│       ├── Dtos.cs                        # Request DTOs (Create, Update)
+│       ├── TodoQueryParams.cs             # Query params + PagedResult<T>
 │       ├── Filters/
-│       │   └── ValidationFilter.cs   # FluentValidation endpoint filter
+│       │   └── ValidationFilter.cs        # FluentValidation endpoint filter
 │       ├── Mapping/
-│       │   └── TodoProfile.cs        # AutoMapper profile
+│       │   └── TodoProfile.cs             # AutoMapper profile
 │       ├── Repositories/
 │       │   ├── ITodoRepository.cs
 │       │   └── TodoRepository.cs
@@ -39,12 +54,12 @@ TodoApi.Web/
 │           ├── CreateTodoDtoValidator.cs
 │           └── UpdateTodoDtoValidator.cs
 ├── Extensions/
-│   └── ServiceCollectionExtensions.cs  # DI extension methods
-├── Program.cs                           # App entry point & middleware
+│   └── ServiceCollectionExtensions.cs    # DI extension methods
+├── Program.cs                             # App entry point & middleware
 ├── appsettings.json
 ├── appsettings.Development.json
 ├── appsettings.Production.json
-└── todos.db                             # SQLite database file (auto-generated)
+└── todos.db                               # SQLite database file (auto-generated)
 ```
 
 ---
@@ -60,7 +75,8 @@ The application reads configuration from `appsettings.json`, environment variabl
 | `Jwt__Secret` | Secret key for signing JWT tokens (min. 32 characters) | Yes |
 | `Jwt__Issuer` | JWT token issuer | No (default: `todo-api`) |
 | `Jwt__Audience` | JWT token audience | No (default: `todo-api`) |
-| `Jwt__ExpirationHours` | Token expiration duration in hours | No (default: `24`) |
+| `Jwt__ExpirationHours` | Access token expiration in hours | No (default: `24`) |
+| `Jwt__RefreshExpirationDays` | Refresh token expiration in days | No (default: `7`) |
 
 > The application will **throw an exception** on startup if `Jwt__Secret` is not set.
 
@@ -81,6 +97,7 @@ dotnet user-secrets set "Jwt:Secret" "your-super-secret-key-minimum-32-chars" --
 dotnet user-secrets set "Jwt:Issuer" "todo-api" --project TodoApi.Web
 dotnet user-secrets set "Jwt:Audience" "todo-api" --project TodoApi.Web
 dotnet user-secrets set "Jwt:ExpirationHours" "24" --project TodoApi.Web
+dotnet user-secrets set "Jwt:RefreshExpirationDays" "7" --project TodoApi.Web
 
 # List all stored secrets
 dotnet user-secrets list --project TodoApi.Web
@@ -98,6 +115,7 @@ export Jwt__Secret="your-super-secret-key-minimum-32-chars"
 export Jwt__Issuer="todo-api"
 export Jwt__Audience="todo-api"
 export Jwt__ExpirationHours="24"
+export Jwt__RefreshExpirationDays="7"
 
 dotnet run --project TodoApi.Web
 ```
@@ -120,7 +138,7 @@ dotnet run --project TodoApi.Web
 
 ### Option 3: appsettings.json (Not Recommended for Secrets)
 
-For non-sensitive values, you can set them directly in `appsettings.json`. **Do not store secrets here if the file is committed to a repository.**
+For non-sensitive values, you can set them directly in `appsettings.json`.
 
 ```json
 {
@@ -128,7 +146,8 @@ For non-sensitive values, you can set them directly in `appsettings.json`. **Do 
     "Secret": "",
     "Issuer": "todo-api",
     "Audience": "todo-api",
-    "ExpirationHours": 24
+    "ExpirationHours": 24,
+    "RefreshExpirationDays": 7
   }
 }
 ```
@@ -146,6 +165,7 @@ services:
       - Jwt__Secret=your-super-secret-key-minimum-32-chars
       - Jwt__Issuer=todo-api
       - Jwt__Audience=todo-api
+      - Jwt__RefreshExpirationDays=7
       - ASPNETCORE_ENVIRONMENT=Production
     ports:
       - "8080:8080"
@@ -206,7 +226,31 @@ Swagger UI available at: `http://localhost:5170/swagger` (Development mode only)
 
 ## Authentication
 
-This API uses **JWT Bearer Authentication**. All `/api/todos` endpoints require a valid token.
+This API uses **JWT Bearer Authentication** with **Refresh Token** support. All `/api/todos` endpoints require a valid access token.
+
+There is no default user — you must register first.
+
+### Register
+
+```http
+POST /api/auth/register
+Content-Type: application/json
+
+{
+  "username": "yourname",
+  "password": "yourpassword"
+}
+```
+
+Constraints: username 3–50 chars, password min. 6 chars.
+
+Response:
+```json
+{
+  "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "refreshToken": "base64-encoded-refresh-token..."
+}
+```
 
 ### Login
 
@@ -215,27 +259,49 @@ POST /api/auth/login
 Content-Type: application/json
 
 {
-  "username": "admin",
-  "password": "password"
+  "username": "yourname",
+  "password": "yourpassword"
 }
 ```
 
 Response:
 ```json
 {
-  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+  "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "refreshToken": "base64-encoded-refresh-token..."
 }
 ```
 
-### Using the Token
+### Refresh Token
 
-Include the token in the `Authorization` header for every request to `/api/todos`:
+When the access token expires, use the refresh token to get a new pair of tokens. The old refresh token is revoked after use.
 
 ```http
-Authorization: Bearer <token>
+POST /api/auth/refresh
+Content-Type: application/json
+
+{
+  "refreshToken": "base64-encoded-refresh-token..."
+}
 ```
 
-In Swagger UI, click the **Authorize** button and enter the token in the format `Bearer <token>`.
+Response:
+```json
+{
+  "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "refreshToken": "new-base64-encoded-refresh-token..."
+}
+```
+
+### Using the Access Token
+
+Include the access token in the `Authorization` header for every request to `/api/todos`:
+
+```http
+Authorization: Bearer <accessToken>
+```
+
+In Swagger UI, click the **Authorize** button and enter the token in the format `Bearer <accessToken>`.
 
 ---
 
@@ -243,14 +309,16 @@ In Swagger UI, click the **Authorize** button and enter the token in the format 
 
 Base URL: `/api`
 
-| Method | Endpoint              | Auth | Description                              |
-|--------|-----------------------|------|------------------------------------------|
-| POST   | `/api/auth/login`     | No   | Login and retrieve a JWT token           |
-| GET    | `/api/todos`          | Yes  | List todos (pagination, search, sorting) |
-| GET    | `/api/todos/{id}`     | Yes  | Get a todo by ID                         |
-| POST   | `/api/todos`          | Yes  | Create a new todo                        |
-| PUT    | `/api/todos/{id}`     | Yes  | Update a todo                            |
-| DELETE | `/api/todos/{id}`     | Yes  | Delete a todo                            |
+| Method | Endpoint               | Auth | Description                              |
+|--------|------------------------|------|------------------------------------------|
+| POST   | `/api/auth/register`   | No   | Register a new user                      |
+| POST   | `/api/auth/login`      | No   | Login and retrieve access + refresh token|
+| POST   | `/api/auth/refresh`    | No   | Refresh access token using refresh token |
+| GET    | `/api/todos`           | Yes  | List todos (pagination, search, sorting) |
+| GET    | `/api/todos/{id}`      | Yes  | Get a todo by ID                         |
+| POST   | `/api/todos`           | Yes  | Create a new todo                        |
+| PUT    | `/api/todos/{id}`      | Yes  | Update a todo                            |
+| DELETE | `/api/todos/{id}`      | Yes  | Delete a todo                            |
 
 ### GET /api/todos — Query Parameters
 
@@ -320,9 +388,11 @@ In Development mode, the response also includes `exceptionType` to aid debugging
 
 ## Seed Data
 
-The database is initialized with 2 records:
+The database is initialized with 2 todo records:
 
 | ID | Title     | IsCompleted |
 |----|-----------|-------------|
 | 1  | Buy milk  | false       |
 | 2  | Call mom  | true        |
+
+> There is no default user. Use `POST /api/auth/register` to create an account before accessing todo endpoints.
