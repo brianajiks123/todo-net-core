@@ -16,3 +16,5 @@ public record UpdateTodoDto
 
     bool? IsCompleted = null
 );
+
+public record TodoResponseDto(int Id, string Title, bool IsCompleted, DateTime CreatedAt);

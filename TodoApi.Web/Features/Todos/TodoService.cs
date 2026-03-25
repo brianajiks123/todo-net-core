@@ -4,6 +4,8 @@ namespace TodoApi.Web.Features.Todos;
 
 public enum UpdateResult { Success, NotFound, InvalidTitle }
 
+public record UpdateResultWithData(UpdateResult Result, TodoResponseDto? Data = null);
+
 public class TodoService
 {
     private readonly IUnitOfWork _unitOfWork;
@@ -15,43 +17,41 @@ public class TodoService
         _mapper = mapper;
     }
 
-    public async Task<List<Todo>> GetAll(int userId) 
-        => await _unitOfWork.Todos.GetAllByUserIdAsync(userId);
+    public async Task<TodoResponseDto?> GetById(int id, int userId)
+    {
+        var todo = await _unitOfWork.Todos.GetByIdAsync(id, userId);
+        return todo is null ? null : _mapper.Map<TodoResponseDto>(todo);
+    }
 
-    public async Task<Todo?> GetById(int id, int userId) 
-        => await _unitOfWork.Todos.GetByIdAsync(id, userId);
-
-    public async Task<Todo> Create(string title, int userId)
+    public async Task<TodoResponseDto> Create(string title, int userId)
     {
         var dto = new CreateTodoDto(title.Trim());
         var todo = _mapper.Map<Todo>(dto);
-
         todo.UserId = userId;
 
         await _unitOfWork.Todos.AddAsync(todo);
         await _unitOfWork.SaveChangesAsync();
-        return todo;
+        return _mapper.Map<TodoResponseDto>(todo);
     }
 
-    public async Task<UpdateResult> Update(int id, string? title, bool? isCompleted, int userId)
+    public async Task<UpdateResultWithData> Update(int id, string? title, bool? isCompleted, int userId)
     {
-        var todo = await GetById(id, userId);
-
-        if (todo is null) return UpdateResult.NotFound;
+        var todo = await _unitOfWork.Todos.GetByIdAsync(id, userId);
+        if (todo is null) return new(UpdateResult.NotFound);
 
         if (title is not null) todo.Title = title.Trim();
         if (isCompleted.HasValue) todo.IsCompleted = isCompleted.Value;
 
         if (string.IsNullOrWhiteSpace(todo.Title))
-            return UpdateResult.InvalidTitle;
+            return new(UpdateResult.InvalidTitle);
 
         await _unitOfWork.SaveChangesAsync();
-        return UpdateResult.Success;
+        return new(UpdateResult.Success, _mapper.Map<TodoResponseDto>(todo));
     }
 
     public async Task<bool> Delete(int id, int userId)
     {
-        var todo = await GetById(id, userId);
+        var todo = await _unitOfWork.Todos.GetByIdAsync(id, userId);
         if (todo is null) return false;
 
         _unitOfWork.Todos.Delete(todo);
@@ -59,6 +59,16 @@ public class TodoService
         return true;
     }
 
-    public async Task<PagedResult<Todo>> GetPaged(TodoQueryParams query, int userId)
-        => await _unitOfWork.Todos.GetPagedAsync(query, userId);
+    public async Task<PagedResult<TodoResponseDto>> GetPaged(TodoQueryParams query, int userId)
+    {
+        var paged = await _unitOfWork.Todos.GetPagedAsync(query, userId);
+        return new PagedResult<TodoResponseDto>
+        {
+            Items = _mapper.Map<IEnumerable<TodoResponseDto>>(paged.Items),
+            Page = paged.Page,
+            Size = paged.Size,
+            TotalItems = paged.TotalItems,
+            TotalPages = paged.TotalPages
+        };
+    }
 }

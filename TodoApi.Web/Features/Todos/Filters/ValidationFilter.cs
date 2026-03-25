@@ -16,9 +16,7 @@ public class ValidationFilter<T> : IEndpointFilter where T : class
     {
         var dto = context.Arguments.OfType<T>().FirstOrDefault();
         if (dto is null)
-        {
             return await next(context);
-        }
 
         var validationResult = await _validator.ValidateAsync(dto);
         if (!validationResult.IsValid)
@@ -29,7 +27,9 @@ public class ValidationFilter<T> : IEndpointFilter where T : class
                     g => g.Key,
                     g => g.Select(e => e.ErrorMessage).ToArray());
 
-            return Results.ValidationProblem(errors, statusCode: StatusCodes.Status400BadRequest);
+            return Results.Json(
+                new { success = false, message = "Validasi gagal.", errors },
+                statusCode: StatusCodes.Status400BadRequest);
         }
 
         return await next(context);

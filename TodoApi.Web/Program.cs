@@ -1,4 +1,3 @@
-using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -7,7 +6,6 @@ using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using TodoApi.Web;
 using TodoApi.Web.Extensions;
-using TodoApi.Web.Features.Auth;
 using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -141,45 +139,10 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 // ────────────────────────────────────────
-// Auth Endpoints (Register + Login + Refresh)
+// Endpoints
 // ────────────────────────────────────────
-var authGroup = app.MapGroup("/api/auth");
-
-authGroup.MapPost("/register",
-    async (RegisterDto dto, [FromServices] AuthService service) =>
-        Results.Ok(await service.RegisterAsync(dto)))
-    .AddEndpointFilter<ValidationFilter<RegisterDto>>()
-    .WithTags("Auth")
-    .WithSummary("Registrasi user baru");
-
-authGroup.MapPost("/login",
-    async (LoginDto dto, [FromServices] AuthService service) =>
-    {
-        var result = await service.LoginAsync(dto);
-        return result is not null
-            ? Results.Ok(result)
-            : Results.Unauthorized();
-    })
-    .AddEndpointFilter<ValidationFilter<LoginDto>>()
-    .WithTags("Auth")
-    .WithSummary("Login dan dapatkan Access Token + Refresh Token");
-
-authGroup.MapPost("/refresh",
-    async (RefreshRequestDto dto, [FromServices] AuthService service) =>
-    {
-        var result = await service.RefreshTokenAsync(dto.RefreshToken);
-        return result is not null
-            ? Results.Ok(result)
-            : Results.Unauthorized();
-    })
-    .AddEndpointFilter<ValidationFilter<RefreshRequestDto>>()
-    .WithTags("Auth")
-    .WithSummary("Refresh Access Token menggunakan Refresh Token");
-
-// ────────────────────────────────────────
-// Todo Endpoints
-// ────────────────────────────────────────
-app.MapGroup("/api")
-   .MapTodoEndpoints();
+var api = app.MapGroup("/api");
+api.MapAuthEndpoints();
+api.MapTodoEndpoints();
 
 app.Run();

@@ -10,5 +10,7 @@ public class TodoProfile : Profile
         CreateMap<CreateTodoDto, Todo>()
             .ForMember(dest => dest.CreatedAt, opt => opt.MapFrom(_ => DateTime.UtcNow))
             .ForMember(dest => dest.IsCompleted, opt => opt.MapFrom(_ => false));
+
+        CreateMap<Todo, TodoResponseDto>();
     }
 }

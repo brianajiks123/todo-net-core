@@ -55,12 +55,46 @@ TodoApi.Web/
 │           └── UpdateTodoDtoValidator.cs
 ├── Extensions/
 │   └── ServiceCollectionExtensions.cs    # DI extension methods
+├── ApiResponse.cs                         # Standardized response envelope
 ├── Program.cs                             # App entry point & middleware
 ├── appsettings.json
 ├── appsettings.Development.json
 ├── appsettings.Production.json
 └── todos.db                               # SQLite database file (auto-generated)
 ```
+
+---
+
+## Response Format
+
+All endpoints return a consistent `ApiResponse<T>` envelope:
+
+```json
+{
+  "success": true,
+  "data": { ... },
+  "message": "Optional message"
+}
+```
+
+On failure:
+```json
+{
+  "success": false,
+  "data": null,
+  "message": "Error description"
+}
+```
+
+For endpoints that don't return data (e.g. DELETE), the non-generic `ApiResponse` is used:
+```json
+{
+  "success": true,
+  "message": "Todo berhasil dihapus."
+}
+```
+
+Unhandled exceptions are returned in [RFC 9457 ProblemDetails](https://www.rfc-editor.org/rfc/rfc9457) format (see [Error Handling](#error-handling)).
 
 ---
 
@@ -84,8 +118,6 @@ The application reads configuration from `appsettings.json`, environment variabl
 
 ### Option 1: User Secrets (Recommended for Development)
 
-User Secrets are not committed to version control, making them ideal for local development.
-
 ```bash
 # Initialize (already configured in .csproj, skip if already done)
 dotnet user-secrets init --project TodoApi.Web
@@ -107,38 +139,21 @@ dotnet user-secrets list --project TodoApi.Web
 
 ### Option 2: Environment Variables
 
-ASP.NET Core reads environment variables using `__` (double underscore) as a separator instead of `:`.
-
 **Linux / macOS:**
 ```bash
 export Jwt__Secret="your-super-secret-key-minimum-32-chars"
-export Jwt__Issuer="todo-api"
-export Jwt__Audience="todo-api"
-export Jwt__ExpirationHours="24"
-export Jwt__RefreshExpirationDays="7"
-
-dotnet run --project TodoApi.Web
-```
-
-**Windows (Command Prompt):**
-```cmd
-set Jwt__Secret=your-super-secret-key-minimum-32-chars
-set Jwt__Issuer=todo-api
 dotnet run --project TodoApi.Web
 ```
 
 **Windows (PowerShell):**
 ```powershell
 $env:Jwt__Secret = "your-super-secret-key-minimum-32-chars"
-$env:Jwt__Issuer = "todo-api"
 dotnet run --project TodoApi.Web
 ```
 
 ---
 
 ### Option 3: appsettings.json (Not Recommended for Secrets)
-
-For non-sensitive values, you can set them directly in `appsettings.json`.
 
 ```json
 {
@@ -157,7 +172,6 @@ For non-sensitive values, you can set them directly in `appsettings.json`.
 ### Option 4: Docker / Docker Compose
 
 ```yaml
-# docker-compose.yml
 services:
   todoapi:
     build: .
@@ -174,8 +188,6 @@ services:
 ---
 
 ### Configuration Priority
-
-ASP.NET Core reads configuration in the following order (later sources override earlier ones):
 
 1. `appsettings.json`
 2. `appsettings.{Environment}.json`
@@ -200,7 +212,7 @@ git clone <repo-url>
 cd TodoApi
 ```
 
-2. Set the JWT Secret (choose one of the options above, example using User Secrets)
+2. Set the JWT Secret
 
 ```bash
 dotnet user-secrets set "Jwt:Secret" "your-super-secret-key-minimum-32-chars" --project TodoApi.Web
@@ -218,9 +230,8 @@ dotnet ef database update --project TodoApi.Web
 dotnet run --project TodoApi.Web
 ```
 
-App runs at: `http://localhost:5170`
-
-Swagger UI available at: `http://localhost:5170/swagger` (Development mode only)
+App runs at: `http://localhost:5170`  
+Swagger UI: `http://localhost:5170/swagger` (Development only)
 
 ---
 
@@ -244,11 +255,15 @@ Content-Type: application/json
 
 Constraints: username 3–50 chars, password min. 6 chars.
 
-Response:
+Response `200 OK`:
 ```json
 {
-  "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "refreshToken": "base64-encoded-refresh-token..."
+  "success": true,
+  "data": {
+    "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "refreshToken": "base64-encoded-refresh-token..."
+  },
+  "message": "Registrasi berhasil."
 }
 ```
 
@@ -264,17 +279,27 @@ Content-Type: application/json
 }
 ```
 
-Response:
+Response `200 OK`:
 ```json
 {
-  "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "refreshToken": "base64-encoded-refresh-token..."
+  "success": true,
+  "data": {
+    "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "refreshToken": "base64-encoded-refresh-token..."
+  },
+  "message": "Login berhasil."
+}
+```
+
+Response `401 Unauthorized` (wrong credentials):
+```json
+{
+  "success": false,
+  "message": "Username atau password salah."
 }
 ```
 
 ### Refresh Token
-
-When the access token expires, use the refresh token to get a new pair of tokens. The old refresh token is revoked after use.
 
 ```http
 POST /api/auth/refresh
@@ -285,23 +310,33 @@ Content-Type: application/json
 }
 ```
 
-Response:
+Response `200 OK`:
 ```json
 {
-  "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "refreshToken": "new-base64-encoded-refresh-token..."
+  "success": true,
+  "data": {
+    "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "refreshToken": "new-base64-encoded-refresh-token..."
+  },
+  "message": "Token berhasil diperbarui."
+}
+```
+
+Response `401 Unauthorized` (invalid/expired token):
+```json
+{
+  "success": false,
+  "message": "Refresh token tidak valid atau sudah kedaluwarsa."
 }
 ```
 
 ### Using the Access Token
 
-Include the access token in the `Authorization` header for every request to `/api/todos`:
-
 ```http
 Authorization: Bearer <accessToken>
 ```
 
-In Swagger UI, click the **Authorize** button and enter the token in the format `Bearer <accessToken>`.
+In Swagger UI, click **Authorize** and enter `Bearer <accessToken>`.
 
 ---
 
@@ -320,43 +355,84 @@ Base URL: `/api`
 | PUT    | `/api/todos/{id}`      | Yes  | Update a todo                            |
 | DELETE | `/api/todos/{id}`      | Yes  | Delete a todo                            |
 
-### GET /api/todos — Query Parameters
+---
 
-| Parameter | Type   | Default | Description                                              |
-|-----------|--------|---------|----------------------------------------------------------|
-| `page`    | int    | 1       | Page number (min: 1)                                     |
-| `size`    | int    | 10      | Items per page (1–50)                                    |
-| `search`  | string | -       | Filter by title (case-insensitive)                       |
-| `sort`    | string | -       | Sort by `title`, `createdat`, `iscompleted` + `:desc`    |
+### GET /api/todos
+
+Query Parameters:
+
+| Parameter | Type   | Default | Description                                           |
+|-----------|--------|---------|-------------------------------------------------------|
+| `page`    | int    | 1       | Page number (min: 1)                                  |
+| `size`    | int    | 10      | Items per page (1–50)                                 |
+| `search`  | string | -       | Filter by title (case-insensitive)                    |
+| `sort`    | string | -       | Sort by `title`, `createdat`, `iscompleted` + `:desc` |
 
 Example: `GET /api/todos?page=1&size=5&search=milk&sort=createdat:desc`
 
-### Paginated Response
-
+Response `200 OK`:
 ```json
 {
-  "items": [...],
-  "page": 1,
-  "size": 10,
-  "totalItems": 25,
-  "totalPages": 3,
-  "hasNext": true,
-  "hasPrevious": false
+  "success": true,
+  "data": {
+    "items": [
+      { "id": 1, "title": "Buy milk", "isCompleted": false, "createdAt": "2026-03-25T00:00:00Z" }
+    ],
+    "page": 1,
+    "size": 10,
+    "totalItems": 1,
+    "totalPages": 1,
+    "hasNext": false,
+    "hasPrevious": false
+  },
+  "message": null
 }
 ```
 
-### POST /api/todos — Request Body
+---
 
+### GET /api/todos/{id}
+
+Response `200 OK`:
 ```json
 {
-  "title": "Buy milk"
+  "success": true,
+  "data": { "id": 1, "title": "Buy milk", "isCompleted": false, "createdAt": "2026-03-25T00:00:00Z" },
+  "message": null
 }
 ```
 
-### PUT /api/todos/{id} — Request Body
+Response `404 Not Found`:
+```json
+{
+  "success": false,
+  "message": "Todo dengan ID 1 tidak ditemukan."
+}
+```
+
+---
+
+### POST /api/todos
+
+Request body:
+```json
+{ "title": "Buy milk" }
+```
+
+Response `201 Created`:
+```json
+{
+  "success": true,
+  "data": { "id": 3, "title": "Buy milk", "isCompleted": false, "createdAt": "2026-03-25T00:00:00Z" },
+  "message": "Todo berhasil dibuat."
+}
+```
+
+---
+
+### PUT /api/todos/{id}
 
 All fields are optional (partial update):
-
 ```json
 {
   "title": "Buy UHT milk",
@@ -364,21 +440,66 @@ All fields are optional (partial update):
 }
 ```
 
+Response `200 OK`:
+```json
+{
+  "success": true,
+  "data": { "id": 1, "title": "Buy UHT milk", "isCompleted": true, "createdAt": "2026-03-25T00:00:00Z" },
+  "message": "Todo berhasil diperbarui."
+}
+```
+
+Response `404 Not Found`:
+```json
+{
+  "success": false,
+  "message": "Todo dengan ID 1 tidak ditemukan."
+}
+```
+
+Response `400 Bad Request` (empty title):
+```json
+{
+  "success": false,
+  "message": "Judul tidak boleh kosong."
+}
+```
+
+---
+
+### DELETE /api/todos/{id}
+
+Response `200 OK`:
+```json
+{
+  "success": true,
+  "message": "Todo berhasil dihapus."
+}
+```
+
+Response `404 Not Found`:
+```json
+{
+  "success": false,
+  "message": "Todo dengan ID 1 tidak ditemukan."
+}
+```
+
 ---
 
 ## Error Handling
 
-All errors are returned in [RFC 9457 ProblemDetails](https://www.rfc-editor.org/rfc/rfc9457) format:
+Unhandled exceptions are returned in [RFC 9457 ProblemDetails](https://www.rfc-editor.org/rfc/rfc9457) format:
 
 ```json
 {
   "type": "https://httpstatuses.com/500",
-  "title": "An internal server error occurred",
+  "title": "Terjadi kesalahan internal server",
   "status": 500,
   "detail": "...",
   "instance": "POST /api/todos",
   "traceId": "...",
-  "timestamp": "2026-03-23T00:00:00Z"
+  "timestamp": "2026-03-25T00:00:00Z"
 }
 ```
 
