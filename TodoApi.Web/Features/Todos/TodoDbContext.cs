@@ -21,7 +21,10 @@ public class TodoDbContext : DbContext
         {
             entity.HasKey(t => t.Id);
             entity.Property(t => t.Title).IsRequired().HasMaxLength(200);
+            entity.Property(t => t.CreatedBy).IsRequired();
             entity.Property(t => t.CreatedAt).IsRequired();
+            entity.Property(t => t.UpdatedBy).IsRequired();
+            entity.Property(t => t.UpdatedAt).IsRequired();
             entity.Property(t => t.UserId).IsRequired();
 
             entity.Property(t => t.IsDeleted)
