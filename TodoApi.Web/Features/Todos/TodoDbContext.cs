@@ -22,6 +22,12 @@ public class TodoDbContext : DbContext
             entity.HasKey(t => t.Id);
             entity.Property(t => t.Title).IsRequired().HasMaxLength(200);
             entity.Property(t => t.CreatedAt).IsRequired();
+            entity.Property(t => t.UserId).IsRequired();
+
+            entity.HasOne(t => t.User)
+                .WithMany(u => u.Todos)
+                .HasForeignKey(t => t.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         // User Configuration
@@ -49,23 +55,5 @@ public class TodoDbContext : DbContext
                   .HasForeignKey(rt => rt.UserId)
                   .OnDelete(DeleteBehavior.Cascade);
         });
-
-        // Seed Data
-        modelBuilder.Entity<Todo>().HasData(
-            new Todo
-            {
-                Id = 1,
-                Title = "Buy milk",
-                IsCompleted = false,
-                CreatedAt = new DateTime(2025, 3, 20, 0, 0, 0, DateTimeKind.Utc)
-            },
-            new Todo
-            {
-                Id = 2,
-                Title = "Call mom",
-                IsCompleted = true,
-                CreatedAt = new DateTime(2025, 3, 21, 0, 0, 0, DateTimeKind.Utc)
-            }
-        );
     }
 }

@@ -6,16 +6,14 @@ public class TodoRepository : ITodoRepository
 {
     private readonly TodoDbContext _context;
 
-    public TodoRepository(TodoDbContext context)
-    {
-        _context = context;
-    }
+    public TodoRepository(TodoDbContext context) => _context = context;
 
-    public async Task<List<Todo>> GetAllAsync() 
-        => await _context.Todos.ToListAsync();
+    public async Task<List<Todo>> GetAllByUserIdAsync(int userId)
+        => await _context.Todos.Where(t => t.UserId == userId).ToListAsync();
 
-    public async Task<Todo?> GetByIdAsync(int id) 
-        => await _context.Todos.FindAsync(id);
+    public async Task<Todo?> GetByIdAsync(int id, int userId)
+        => await _context.Todos
+            .FirstOrDefaultAsync(t => t.Id == id && t.UserId == userId);
 
     public async Task AddAsync(Todo todo) 
         => await _context.Todos.AddAsync(todo);
@@ -26,9 +24,9 @@ public class TodoRepository : ITodoRepository
     public void Delete(Todo todo) 
         => _context.Todos.Remove(todo);
 
-    public async Task<PagedResult<Todo>> GetPagedAsync(TodoQueryParams query)
+    public async Task<PagedResult<Todo>> GetPagedAsync(TodoQueryParams query, int userId)
     {
-        var todos = _context.Todos.AsQueryable();
+        var todos = _context.Todos.Where(t => t.UserId == userId).AsQueryable();
 
         // Filtering
         if (!string.IsNullOrWhiteSpace(query.Search))
@@ -83,9 +81,9 @@ public class TodoRepository : ITodoRepository
         };
     }
 
-    public async Task<bool> ExistsWithTitleAsync(string title, CancellationToken ct = default)
+    public async Task<bool> ExistsWithTitleAsync(string title, int userId, CancellationToken ct = default)
     {
         return await _context.Todos
-            .AnyAsync(t => t.Title.Trim().ToLower() == title.Trim().ToLower(), ct);
+            .AnyAsync(t => t.UserId == userId && t.Title.Trim().ToLower() == title.Trim().ToLower(), ct);
     }
 }

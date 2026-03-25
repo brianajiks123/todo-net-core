@@ -93,25 +93,14 @@ namespace TodoApi.Web.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("TEXT");
 
+                    b.Property<int>("UserId")
+                        .HasColumnType("INTEGER");
+
                     b.HasKey("Id");
 
-                    b.ToTable("Todos");
+                    b.HasIndex("UserId");
 
-                    b.HasData(
-                        new
-                        {
-                            Id = 1,
-                            CreatedAt = new DateTime(2025, 3, 20, 0, 0, 0, 0, DateTimeKind.Utc),
-                            IsCompleted = false,
-                            Title = "Buy milk"
-                        },
-                        new
-                        {
-                            Id = 2,
-                            CreatedAt = new DateTime(2025, 3, 21, 0, 0, 0, 0, DateTimeKind.Utc),
-                            IsCompleted = true,
-                            Title = "Call mom"
-                        });
+                    b.ToTable("Todos");
                 });
 
             modelBuilder.Entity("TodoApi.Web.Features.Auth.RefreshToken", b =>
@@ -123,6 +112,22 @@ namespace TodoApi.Web.Migrations
                         .IsRequired();
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("TodoApi.Web.Features.Todos.Todo", b =>
+                {
+                    b.HasOne("TodoApi.Web.Features.Auth.User", "User")
+                        .WithMany("Todos")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("TodoApi.Web.Features.Auth.User", b =>
+                {
+                    b.Navigation("Todos");
                 });
 #pragma warning restore 612, 618
         }

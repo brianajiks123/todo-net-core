@@ -19,6 +19,8 @@ public static class ServiceCollectionExtensions
 
         services.AddAutoMapper(cfg => {}, typeof(TodoProfile));
 
+        services.AddHttpContextAccessor();
+
         return services;
     }
 }
