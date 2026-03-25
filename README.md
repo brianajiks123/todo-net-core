@@ -35,10 +35,10 @@ TodoApi.Web/
 │   │       └── RefreshRequestDtoValidator.cs
 │   └── Todos/
 │       ├── Todo.cs                        # Entity model
-│       ├── TodoDbContext.cs               # EF Core DbContext + seed data
+│       ├── TodoDbContext.cs               # EF Core DbContext
 │       ├── TodoService.cs                 # Business logic & queries
 │       ├── TodoEndpoints.cs               # Minimal API route handlers
-│       ├── Dtos.cs                        # Request DTOs (Create, Update)
+│       ├── Dtos.cs                        # Request/Response DTOs
 │       ├── TodoQueryParams.cs             # Query params + PagedResult<T>
 │       ├── Filters/
 │       │   └── ValidationFilter.cs        # FluentValidation endpoint filter
@@ -161,8 +161,7 @@ dotnet run --project TodoApi.Web
     "Secret": "",
     "Issuer": "todo-api",
     "Audience": "todo-api",
-    "ExpirationHours": 24,
-    "RefreshExpirationDays": 7
+    "ExpirationHours": 24
   }
 }
 ```
@@ -355,6 +354,8 @@ Base URL: `/api`
 | PUT    | `/api/todos/{id}`      | Yes  | Update a todo                            |
 | DELETE | `/api/todos/{id}`      | Yes  | Delete a todo                            |
 
+> Each user can only access their own todos. Todos are scoped to the authenticated user.
+
 ---
 
 ### GET /api/todos
@@ -419,6 +420,8 @@ Request body:
 { "title": "Buy milk" }
 ```
 
+Constraints: title 1–200 characters.
+
 Response `201 Created`:
 ```json
 {
@@ -439,6 +442,8 @@ All fields are optional (partial update):
   "isCompleted": true
 }
 ```
+
+Constraints: title 1–200 characters (if provided).
 
 Response `200 OK`:
 ```json
@@ -504,16 +509,3 @@ Unhandled exceptions are returned in [RFC 9457 ProblemDetails](https://www.rfc-e
 ```
 
 In Development mode, the response also includes `exceptionType` to aid debugging.
-
----
-
-## Seed Data
-
-The database is initialized with 2 todo records:
-
-| ID | Title     | IsCompleted |
-|----|-----------|-------------|
-| 1  | Buy milk  | false       |
-| 2  | Call mom  | true        |
-
-> There is no default user. Use `POST /api/auth/register` to create an account before accessing todo endpoints.

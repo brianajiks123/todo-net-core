@@ -7,6 +7,7 @@ using Microsoft.OpenApi.Models;
 using TodoApi.Web;
 using TodoApi.Web.Extensions;
 using System.Text;
+using System.Text.Json;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -71,6 +72,32 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidIssuer = jwtSettings["Issuer"] ?? "todo-api",
             ValidAudience = jwtSettings["Audience"] ?? "todo-api",
             IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret))
+        };
+
+        options.Events = new JwtBearerEvents
+        {
+            OnChallenge = async context =>
+            {
+                context.HandleResponse();
+
+                context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                context.Response.ContentType = "application/json";
+
+                var message = string.IsNullOrEmpty(context.ErrorDescription)
+                    ? "Akses ditolak. Token tidak valid atau tidak ditemukan."
+                    : context.ErrorDescription;
+
+                var response = ApiResponse.Fail(message);
+                await context.Response.WriteAsync(JsonSerializer.Serialize(response));
+            },
+            OnForbidden = async context =>
+            {
+                context.Response.StatusCode = StatusCodes.Status403Forbidden;
+                context.Response.ContentType = "application/json";
+
+                var response = ApiResponse.Fail("Anda tidak memiliki izin untuk mengakses resource ini.");
+                await context.Response.WriteAsync(JsonSerializer.Serialize(response));
+            }
         };
     });
 
