@@ -33,7 +33,23 @@ public static class ServiceCollectionExtensions
         services.AddEndpointsApiExplorer();
         services.AddSwaggerGen(c =>
         {
-            c.SwaggerDoc("v1", new OpenApiInfo { Title = "Todo API", Version = "v1" });
+            // Version 1
+            c.SwaggerDoc("v1", new OpenApiInfo 
+            { 
+                Title = "Todo API", 
+                Version = "v1",
+                Description = "Version 1 - API Todo Saat Ini"
+            });
+
+            // Version 2
+            c.SwaggerDoc("v2", new OpenApiInfo 
+            { 
+                Title = "Todo API", 
+                Version = "v2",
+                Description = "Version 2 - (Siap untuk breaking changes)"
+            });
+
+            // JWT Security
             c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
             {
                 In = ParameterLocation.Header,
@@ -43,6 +59,7 @@ public static class ServiceCollectionExtensions
                 BearerFormat = "JWT",
                 Scheme = "Bearer"
             });
+
             c.AddSecurityRequirement(new OpenApiSecurityRequirement
             {
                 {

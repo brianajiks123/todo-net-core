@@ -17,7 +17,14 @@ var app = builder.Build();
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
-    app.UseSwaggerUI();
+    app.UseSwaggerUI(options =>
+    {
+        options.SwaggerEndpoint("/swagger/v1/swagger.json", "Todo API v1");
+        options.SwaggerEndpoint("/swagger/v2/swagger.json", "Todo API v2");
+        
+        options.RoutePrefix = "swagger";
+        options.DisplayRequestDuration();
+    });
 }
 
 app.UseGlobalExceptionHandler();

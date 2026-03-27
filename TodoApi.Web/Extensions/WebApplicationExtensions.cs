@@ -108,9 +108,17 @@ public static class WebApplicationExtensions
 
     public static WebApplication MapApiEndpoints(this WebApplication app)
     {
-        var api = app.MapGroup("/api");
-        api.MapAuthEndpoints();
-        api.MapTodoEndpoints();
+        // ==================== VERSION 1 ====================
+        var apiV1 = app.MapGroup("/api/v1");
+
+        apiV1.MapAuthEndpointsV1();
+        apiV1.MapTodoEndpointsV1();
+
+        // ==================== VERSION 2 ====================
+        var apiV2 = app.MapGroup("/api/v2");
+
+        apiV2.MapAuthEndpointsV2();
+        apiV2.MapTodoEndpointsV2();
 
         return app;
     }
