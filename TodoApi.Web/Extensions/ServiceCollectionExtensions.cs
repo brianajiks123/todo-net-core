@@ -20,47 +20,51 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IUnitOfWork, UnitOfWork>();
         services.AddScoped<TodoService>();
         services.AddScoped<AuthService>();
-
         services.AddValidatorsFromAssemblyContaining<CreateTodoDtoValidator>();
         services.AddAutoMapper(cfg => { }, typeof(TodoProfile));
         services.AddHttpContextAccessor();
-
         return services;
     }
 
     public static IServiceCollection AddSwaggerWithJwt(this IServiceCollection services)
     {
         services.AddEndpointsApiExplorer();
-        services.AddSwaggerGen(c =>
+
+        services.AddSwaggerGen(options =>
         {
-            // Version 1
-            c.SwaggerDoc("v1", new OpenApiInfo 
-            { 
-                Title = "Todo API", 
+            // v1
+            options.SwaggerDoc("v1", new OpenApiInfo
+            {
+                Title = "Todo API",
                 Version = "v1",
-                Description = "Version 1 - API Todo Saat Ini"
+                Description = "Version 1 - API Todo",
+                Contact = new OpenApiContact
+                {
+                    Name = "Brian Aji",
+                    Email = "your.email@example.com"
+                }
             });
 
-            // Version 2
-            c.SwaggerDoc("v2", new OpenApiInfo 
-            { 
-                Title = "Todo API", 
+            // v2
+            options.SwaggerDoc("v2", new OpenApiInfo
+            {
+                Title = "Todo API",
                 Version = "v2",
-                Description = "Version 2 - (Siap untuk breaking changes)"
+                Description = "Version 2 - With Rate Limiting"
             });
 
             // JWT Security
-            c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+            options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
             {
                 In = ParameterLocation.Header,
-                Description = "Masukkan JWT dengan format: Bearer {token}",
+                Description = "Input JWT with format: Bearer {token}",
                 Name = "Authorization",
                 Type = SecuritySchemeType.Http,
                 BearerFormat = "JWT",
                 Scheme = "Bearer"
             });
 
-            c.AddSecurityRequirement(new OpenApiSecurityRequirement
+            options.AddSecurityRequirement(new OpenApiSecurityRequirement
             {
                 {
                     new OpenApiSecurityScheme
@@ -86,7 +90,7 @@ public static class ServiceCollectionExtensions
             {
                 var jwtSettings = configuration.GetSection("Jwt");
                 var jwtSecret = jwtSettings["Secret"]
-                    ?? throw new InvalidOperationException("JWT Secret tidak ditemukan. Set via user-secrets atau environment variable.");
+                    ?? throw new InvalidOperationException("JWT Secret is not found. Set via user-secrets or environment variable.");
 
                 options.TokenValidationParameters = new TokenValidationParameters
                 {
@@ -106,26 +110,22 @@ public static class ServiceCollectionExtensions
                         context.HandleResponse();
                         context.Response.StatusCode = StatusCodes.Status401Unauthorized;
                         context.Response.ContentType = "application/json";
-
                         var message = string.IsNullOrEmpty(context.ErrorDescription)
-                            ? "Akses ditolak. Token tidak valid atau tidak ditemukan."
+                            ? "Access is rejected. Token is not valid or not found."
                             : context.ErrorDescription;
-
                         await context.Response.WriteAsync(JsonSerializer.Serialize(ApiResponse.Fail(message)));
                     },
                     OnForbidden = async context =>
                     {
                         context.Response.StatusCode = StatusCodes.Status403Forbidden;
                         context.Response.ContentType = "application/json";
-
                         await context.Response.WriteAsync(JsonSerializer.Serialize(
-                            ApiResponse.Fail("Anda tidak memiliki izin untuk mengakses resource ini.")));
+                            ApiResponse.Fail("You are not allowed to access the resource.")));
                     }
                 };
             });
 
         services.AddAuthorization();
-
         return services;
     }
 
@@ -146,7 +146,6 @@ public static class ServiceCollectionExtensions
                 }
             };
         });
-
         return services;
     }
 }

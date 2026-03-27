@@ -1,0 +1,13 @@
+.swagger-ui .topbar {
+    background-color: #1e2937;
+    border-bottom: 3px solid #3b82f6;
+}
+
+.swagger-ui .info .title {
+    color: #60a5fa;
+}
+
+.swagger-ui .opblock-summary-method {
+    border-radius: 6px;
+    font-weight: 600;
+}
