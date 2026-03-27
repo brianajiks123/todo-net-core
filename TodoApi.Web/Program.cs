@@ -11,6 +11,7 @@ builder.Services.AddDbContext<TodoDbContext>(options =>
 builder.Services.AddTodoServices();
 builder.Services.AddJwtAuthentication(builder.Configuration);
 builder.Services.AddCustomProblemDetails();
+builder.Services.AddCustomRateLimiting();
 
 var app = builder.Build();
 
@@ -31,6 +32,7 @@ app.UseGlobalExceptionHandler();
 app.UseHttpErrorResponses();
 app.UseAuthentication();
 app.UseAuthorization();
-app.MapApiEndpoints();
+app.UseRateLimiter();
 
+app.MapApiEndpoints();
 app.Run();
