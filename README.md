@@ -605,13 +605,22 @@ Every request is automatically assigned a `CorrelationId` (UUID v4). If the clie
 - Propagated through all Serilog log entries for the duration of the request
 - Returned to the client via the `X-Correlation-ID` response header
 
+### Request / Response Body Logging (v2 only)
+
+API v2 uses `UseRequestResponseBodyLogging` middleware to capture request and response bodies:
+
+- Request body is captured for `application/json` content types and attached to the Serilog diagnostic context
+- Response body is only captured when the status code is `>= 400` (errors only), to avoid logging large successful payloads
+- Sensitive fields (`password`, `secret`, `token`, `refreshToken`, `key`, `credential`, `auth`) in the response body are automatically masked before being written to logs
+
 ### Request Logging (v2 only)
 
 API v2 logs each request/response via `UseSerilogRequestLogging`, including:
 
 - Method, path, status code, elapsed time
 - `CorrelationId` and `UserId` (or `anonymous` if unauthenticated)
-- Request headers
+- `RequestBody` (JSON payloads only)
+- `ResponseBody` (error responses only, with sensitive data masked)
 
 ---
 

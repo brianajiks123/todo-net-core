@@ -1,10 +1,10 @@
 using Microsoft.EntityFrameworkCore;
+using Serilog;
 using Swashbuckle.AspNetCore.SwaggerUI;
+using System.Security.Claims;
+using System.Text.RegularExpressions;
 using TodoApi.Web;
 using TodoApi.Web.Extensions;
-using System.Security.Claims;
-using Serilog;
-using Microsoft.AspNetCore.Http;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -47,10 +47,8 @@ if (app.Environment.IsDevelopment())
         options.DocExpansion(DocExpansion.List);
         options.EnableDeepLinking();
         options.EnableFilter();
-        // Custom styling
         options.InjectStylesheet("/swagger/custom.css");
         options.InjectJavascript("/swagger/custom.js");
-        // Dark theme
         options.ConfigObject.AdditionalItems.Add("theme", "dark");
     });
 }
@@ -58,28 +56,29 @@ if (app.Environment.IsDevelopment())
 // Correlation ID for all request
 app.UseCorrelationId();
 
-// Structured request/response logging only for API v2
+// HTTP logging + serilog request logging only for API v2
 app.UseWhen(ctx => ctx.Request.Path.StartsWithSegments("/api/v2"), v2App =>
 {
+    v2App.UseRequestResponseBodyLogging();
+
     v2App.UseSerilogRequestLogging(options =>
     {
         options.MessageTemplate = "HTTP {RequestMethod} {RequestPath} responded {StatusCode} in {Elapsed:0.000}ms | CorrelationId: {CorrelationId} | UserId: {UserId}";
 
         options.EnrichDiagnosticContext = (diagnosticContext, httpContext) =>
         {
-            // Request headers
-            diagnosticContext.Set("RequestHeaders", 
-                httpContext.Request.Headers.ToDictionary(h => h.Key, h => h.Value.ToString()), 
-                destructureObjects: true);
-
-            // Get UserId with safed method
             var userId = httpContext.User?.Claims
-                .FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier || c.Type == "sub")?.Value;
+                .FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier || c.Type == "sub")?.Value ?? "anonymous";
 
-            if (!string.IsNullOrEmpty(userId))
-                diagnosticContext.Set("UserId", userId);
-            else
-                diagnosticContext.Set("UserId", "anonymous");
+            diagnosticContext.Set("UserId", userId);
+
+            // Request Body
+            if (httpContext.Items.TryGetValue("RequestBody", out var req) && req is string rb)
+                diagnosticContext.Set("RequestBody", rb);
+
+            // Response Body only if error
+            if (httpContext.Items.TryGetValue("ResponseBody", out var resp) && resp is string rs)
+                diagnosticContext.Set("ResponseBody", MaskSensitiveData(rs));
         };
     });
 });
@@ -92,3 +91,23 @@ app.UseRateLimiter();
 app.MapApiEndpoints();
 
 app.Run();
+
+// Helper: Mask Sensitive Data
+static string MaskSensitiveData(string? input)
+{
+    if (string.IsNullOrWhiteSpace(input)) return "";
+
+    var result = input;
+    var keywords = new[] { "password", "secret", "token", "refreshToken", "key", "credential", "auth" };
+
+    foreach (var kw in keywords)
+    {
+        result = System.Text.RegularExpressions.Regex.Replace(
+            result,
+            $@"(?i)(""{kw}"":\s*""[^""]*"")",
+            $@"$1 (masked)",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+    }
+
+    return result;
+}
