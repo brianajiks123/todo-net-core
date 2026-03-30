@@ -13,6 +13,7 @@ A simple REST API for todo management built with **ASP.NET Core 10 Minimal API**
 - FluentValidation 12
 - AutoMapper 16
 - Swashbuckle (Swagger UI) 7
+- Serilog (structured logging — Console + rolling JSON file)
 
 ## Project Structure
 
@@ -57,7 +58,8 @@ TodoApi.Web/
 ├── Extensions/
 │   ├── ServiceCollectionExtensions.cs    # DI extension methods
 │   ├── WebApplicationExtensions.cs       # Middleware & endpoint mapping
-│   └── RateLimitingExtensions.cs         # Rate limiting configuration
+│   ├── RateLimitingExtensions.cs         # Rate limiting configuration
+│   └── LoggingExtensions.cs              # Correlation ID middleware
 ├── ApiResponse.cs                         # Standardized response envelope
 ├── Program.cs                             # App entry point & middleware
 ├── appsettings.json
@@ -122,7 +124,7 @@ The application reads configuration from `appsettings.json`, environment variabl
 | `Jwt__Secret` | Secret key for signing JWT tokens (min. 32 characters) | Yes |
 | `Jwt__Issuer` | JWT token issuer | No (default: `todo-api`) |
 | `Jwt__Audience` | JWT token audience | No (default: `todo-api`) |
-| `Jwt__ExpirationHours` | Access token expiration in hours | No (default: `1`) |
+| `Jwt__ExpirationHours` | Access token expiration in hours | No (default: `24`) |
 | `Jwt__RefreshExpirationDays` | Refresh token expiration in days | No (default: `7`) |
 
 > The application will **throw an exception** on startup if `Jwt__Secret` is not set.
@@ -174,7 +176,7 @@ dotnet run --project TodoApi.Web
     "Secret": "",
     "Issuer": "todo-api",
     "Audience": "todo-api",
-    "ExpirationHours": 1,
+    "ExpirationHours": 24,
     "RefreshExpirationDays": 7
   }
 }
@@ -569,6 +571,47 @@ Response `404 Not Found`:
   "message": "Todo with ID 1 not found."
 }
 ```
+
+---
+
+## Logging
+
+This API uses **Serilog** for structured logging with two sinks:
+
+- Console — human-readable output during development
+- File — rolling JSON logs written to `logs/log-{date}.json` (excluded from git)
+
+Log level is configured via `appsettings.json` under the `Serilog` key:
+
+```json
+{
+  "Serilog": {
+    "MinimumLevel": {
+      "Default": "Information",
+      "Override": {
+        "Microsoft": "Warning",
+        "Microsoft.AspNetCore": "Warning",
+        "Microsoft.EntityFrameworkCore": "Warning"
+      }
+    }
+  }
+}
+```
+
+### Correlation ID
+
+Every request is automatically assigned a `CorrelationId` (UUID v4). If the client sends an `X-Correlation-ID` header, that value is used instead. The ID is:
+
+- Propagated through all Serilog log entries for the duration of the request
+- Returned to the client via the `X-Correlation-ID` response header
+
+### Request Logging (v2 only)
+
+API v2 logs each request/response via `UseSerilogRequestLogging`, including:
+
+- Method, path, status code, elapsed time
+- `CorrelationId` and `UserId` (or `anonymous` if unauthenticated)
+- Request headers
 
 ---
 
