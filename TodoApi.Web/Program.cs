@@ -5,7 +5,6 @@ using System.Security.Claims;
 using System.Text.RegularExpressions;
 using TodoApi.Web;
 using TodoApi.Web.Extensions;
-
 var builder = WebApplication.CreateBuilder(args);
 
 // Serilog configuration (Structured + Console + File JSON)
@@ -15,10 +14,7 @@ builder.Host.UseSerilog((ctx, lc) => lc
     .Enrich.WithProperty("Application", "TodoApi")
     .Enrich.WithProperty("Environment", ctx.HostingEnvironment.EnvironmentName)
     .WriteTo.Console()
-    .WriteTo.File(
-        path: "logs/log-.json",
-        rollingInterval: RollingInterval.Day,
-        formatter: new Serilog.Formatting.Json.JsonFormatter()));
+    .WriteTo.Sink(new JsonArrayFileSink("logs", "log-")));
 
 // Services
 builder.Services.AddSwaggerWithJwt();
@@ -29,6 +25,13 @@ builder.Services.AddTodoServices();
 builder.Services.AddJwtAuthentication(builder.Configuration);
 builder.Services.AddCustomProblemDetails();
 builder.Services.AddCustomRateLimiting();
+builder.Services.AddHealthChecks()
+    // Liveness
+    .AddCheck("self", () => Microsoft.Extensions.Diagnostics.HealthChecks.HealthCheckResult.Healthy(), tags: ["liveness"])
+
+    // Readiness
+    .AddDbContextCheck<TodoDbContext>(name: "database", tags: ["readiness", "db"])
+    .AddCheck("todo-api-ready", () => Microsoft.Extensions.Diagnostics.HealthChecks.HealthCheckResult.Healthy(), tags: ["readiness"]);
 
 var app = builder.Build();
 
@@ -88,6 +91,71 @@ app.UseHttpErrorResponses();
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseRateLimiter();
+
+// Liveness Probe
+app.MapHealthChecks("/api/v2/health/liveness", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
+{
+    Predicate = check => check.Tags.Contains("liveness"),
+    ResponseWriter = async (context, report) =>
+    {
+        context.Response.ContentType = "application/json";
+        var result = new
+        {
+            status = report.Status.ToString(),
+            checks = report.Entries.Select(e => new
+            {
+                name = e.Key,
+                status = e.Value.Status.ToString(),
+                description = e.Value.Description
+            })
+        };
+        await context.Response.WriteAsync(System.Text.Json.JsonSerializer.Serialize(result));
+    }
+});
+
+// Readiness Probe
+app.MapHealthChecks("/api/v2/health/readiness", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
+{
+    Predicate = check => check.Tags.Contains("readiness"),
+    ResponseWriter = async (context, report) =>
+    {
+        context.Response.ContentType = "application/json";
+        var result = new
+        {
+            status = report.Status.ToString(),
+            checks = report.Entries.Select(e => new
+            {
+                name = e.Key,
+                status = e.Value.Status.ToString(),
+                description = e.Value.Description,
+                duration = e.Value.Duration
+            }),
+            totalDuration = report.TotalDuration
+        };
+        await context.Response.WriteAsync(System.Text.Json.JsonSerializer.Serialize(result));
+    }
+});
+
+app.MapHealthChecks("/api/v2/health", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
+{
+    ResponseWriter = async (context, report) =>
+    {
+        context.Response.ContentType = "application/json";
+        var result = new
+        {
+            status = report.Status.ToString(),
+            environment = app.Environment.EnvironmentName,
+            checks = report.Entries.Select(e => new
+            {
+                name = e.Key,
+                status = e.Value.Status.ToString(),
+                description = e.Value.Description
+            })
+        };
+        await context.Response.WriteAsync(System.Text.Json.JsonSerializer.Serialize(result));
+    }
+});
+
 app.MapApiEndpoints();
 
 app.Run();

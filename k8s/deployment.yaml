@@ -1,0 +1,55 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: todoapi
+  namespace: todoapi-dev          # (dev/staging/prod)
+  labels:
+    app: todoapi
+spec:
+  replicas: 2                     # Start with 2 pod
+  selector:
+    matchLabels:
+      app: todoapi
+  template:
+    metadata:
+      labels:
+        app: todoapi
+    spec:
+      containers:
+      - name: todoapi
+        image: yourusername/todoapi:v1.0.0     # Image docker name
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8080                  # Port app inside container
+        env:
+        - name: ASPNETCORE_ENVIRONMENT
+          value: "Production"
+        - name: ASPNETCORE_URLS
+          value: "http://+:8080"
+        # JWT secret & creds conf
+        resources:
+          requests:
+            cpu: "200m"
+            memory: "256Mi"
+          limits:
+            cpu: "500m"
+            memory: "512Mi" 
+        # Health check
+        livenessProbe:
+          httpGet:
+            path: /api/v2/health/liveness
+            port: 8080
+          initialDelaySeconds: 15
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+
+        readinessProbe:
+          httpGet:
+            path: /api/v2/health/readiness
+          port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          successThreshold: 1
+          failureThreshold: 3

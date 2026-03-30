@@ -1,0 +1,38 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: todoapi-ingress
+  namespace: todoapi-dev
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /$2          # Strip prefix
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"        # Change true if using HTTPS
+spec:
+  ingressClassName: nginx                                    # Your ingress controller
+  rules:
+  - host: todoapi.example.com                                # Your domain
+    http:
+      paths:
+      - path: /api/v2(/|$)(.*)
+        pathType: Prefix
+        backend:
+          service:
+            name: todoapi-service
+            port:
+              number: 80
+
+      - path: /swagger(/|$)(.*)                              # Optional: expose Swagger
+        pathType: Prefix
+        backend:
+          service:
+            name: todoapi-service
+            port:
+              number: 80
+
+      - path: /api/v1(/|$)(.*)                               # Optional: expose v1 too
+        pathType: Prefix
+        backend:
+          service:
+            name: todoapi-service
+            port:
+              number: 80

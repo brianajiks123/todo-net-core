@@ -59,7 +59,8 @@ TodoApi.Web/
 │   ├── ServiceCollectionExtensions.cs    # DI extension methods
 │   ├── WebApplicationExtensions.cs       # Middleware & endpoint mapping
 │   ├── RateLimitingExtensions.cs         # Rate limiting configuration
-│   └── LoggingExtensions.cs              # Correlation ID middleware
+│   ├── LoggingExtensions.cs              # Correlation ID middleware
+│   └── JsonArrayFormatter.cs             # Custom Serilog sink (rolling JSON array file)
 ├── ApiResponse.cs                         # Standardized response envelope
 ├── Program.cs                             # App entry point & middleware
 ├── appsettings.json
@@ -128,6 +129,8 @@ The application reads configuration from `appsettings.json`, environment variabl
 | `Jwt__RefreshExpirationDays` | Refresh token expiration in days | No (default: `7`) |
 
 > The application will **throw an exception** on startup if `Jwt__Secret` is not set.
+
+> `Jwt__RefreshExpirationDays` is only configurable via User Secrets or environment variables — it is not present in `appsettings.json`.
 
 ---
 
@@ -247,6 +250,118 @@ dotnet run --project TodoApi.Web
 
 App runs at: `http://localhost:5170`  
 Swagger UI: `http://localhost:5170/swagger` (Development only)
+
+---
+
+## Docker
+
+### Prerequisites
+
+- [Docker](https://docs.docker.com/get-docker/) installed
+
+### Build & Run
+
+```bash
+# Build image (run from repo root)
+docker build -t todoapi:latest ./TodoApi.Web
+
+# Run container
+docker run -d \
+  -p 8080:8080 \
+  -e Jwt__Secret="your-super-secret-key-minimum-32-chars" \
+  -e ASPNETCORE_ENVIRONMENT=Production \
+  --name todoapi \
+  todoapi:latest
+```
+
+App runs at: `http://localhost:8080`
+
+### Docker Compose
+
+Create a `docker-compose.yml` at the repo root:
+
+```yaml
+services:
+  todoapi:
+    build:
+      context: ./TodoApi.Web
+    ports:
+      - "8080:8080"
+    environment:
+      - Jwt__Secret=your-super-secret-key-minimum-32-chars
+      - Jwt__Issuer=todo-api
+      - Jwt__Audience=todo-api
+      - Jwt__ExpirationHours=24
+      - Jwt__RefreshExpirationDays=7
+      - ASPNETCORE_ENVIRONMENT=Production
+    restart: unless-stopped
+```
+
+```bash
+docker compose up -d
+```
+
+### Health Check
+
+The container exposes health endpoints used by Docker and Kubernetes:
+
+| Endpoint | Purpose |
+|----------|---------|
+| `GET /api/v2/health/liveness` | Liveness probe — is the app running? |
+| `GET /api/v2/health/readiness` | Readiness probe — is the DB reachable? |
+| `GET /api/v2/health` | Combined health status |
+
+---
+
+## Kubernetes
+
+Manifests are located in the `k8s/` directory.
+
+```
+k8s/
+├── deployment.yaml   # 2 replicas, resource limits, liveness/readiness probes
+├── service.yaml      # ClusterIP service on port 80 → 8080
+└── ingress.yaml      # NGINX ingress for /api/v1, /api/v2, /swagger
+```
+
+### Deploy
+
+```bash
+# Create namespace
+kubectl create namespace todoapi-dev
+
+# Create secret for JWT
+kubectl create secret generic todoapi-secrets \
+  --from-literal=Jwt__Secret="your-super-secret-key-minimum-32-chars" \
+  -n todoapi-dev
+
+# Apply manifests
+kubectl apply -f k8s/ -n todoapi-dev
+
+# Check status
+kubectl get pods -n todoapi-dev
+```
+
+### Update image
+
+Edit `k8s/deployment.yaml` and update the `image` field:
+
+```yaml
+image: yourusername/todoapi:v1.0.0
+```
+
+Then re-apply:
+
+```bash
+kubectl apply -f k8s/deployment.yaml -n todoapi-dev
+```
+
+### Resource Limits
+
+| Resource | Request | Limit |
+|----------|---------|-------|
+| CPU | 200m | 500m |
+| Memory | 256Mi | 512Mi |
 
 ---
 
@@ -579,7 +694,7 @@ Response `404 Not Found`:
 This API uses **Serilog** for structured logging with two sinks:
 
 - Console — human-readable output during development
-- File — rolling JSON logs written to `logs/log-{date}.json` (excluded from git)
+- File — rolling JSON logs written to `logs/log-{date}.json` (excluded from git), using a custom `JsonArrayFileSink` that writes structured log entries as a valid JSON array
 
 Log level is configured via `appsettings.json` under the `Serilog` key:
 
@@ -621,6 +736,10 @@ API v2 logs each request/response via `UseSerilogRequestLogging`, including:
 - `CorrelationId` and `UserId` (or `anonymous` if unauthenticated)
 - `RequestBody` (JSON payloads only)
 - `ResponseBody` (error responses only, with sensitive data masked)
+
+### Custom JSON File Sink
+
+Log files are written using a custom `JsonArrayFileSink` that produces valid JSON arrays (not newline-delimited JSON). Each log entry is a structured object with `Timestamp`, `Level`, `Message`, `Exception` (if any), and `Properties`. Files roll daily and are named `log-{yyyyMMdd}.json`.
 
 ---
 
