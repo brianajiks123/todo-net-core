@@ -11,7 +11,7 @@ public class RegisterDtoValidator : AbstractValidator<RegisterDto>
         _unitOfWork = unitOfWork;
         RuleFor(x => x.Username).NotEmpty().MinimumLength(3).MaximumLength(50)
             .MustAsync(async (u, ct) => !await _unitOfWork.Users.ExistsByUsernameAsync(u, ct))
-            .WithMessage("Username sudah digunakan");
+            .WithMessage("Username is already taken.");
 
         RuleFor(x => x.Password).NotEmpty().MinimumLength(8);
     }

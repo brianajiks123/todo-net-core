@@ -16,11 +16,11 @@ public static class AuthEndpoints
             async (RegisterDto dto, [FromServices] AuthService service) =>
             {
                 var result = await service.RegisterAsync(dto);
-                return Results.Ok(ApiResponse<AuthResponseDto>.Ok(result, "Registrasi berhasil."));
+                return Results.Created("/api/v1/auth/register", ApiResponse<AuthResponseDto>.Ok(result, "Registration successful."));
             })
             .AddEndpointFilter<ValidationFilter<RegisterDto>>()
             .WithName("RegisterV1")
-            .WithSummary("Registrasi user baru (v1)");
+            .WithSummary("Register a new user (v1)");
 
         // POST /api/v1/auth/login
         group.MapPost("/login",
@@ -28,9 +28,9 @@ public static class AuthEndpoints
             {
                 var result = await service.LoginAsync(dto);
                 return result is not null
-                    ? Results.Ok(ApiResponse<AuthResponseDto>.Ok(result, "Login berhasil."))
+                    ? Results.Ok(ApiResponse<AuthResponseDto>.Ok(result, "Login successful."))
                     : Results.Json(
-                        ApiResponse.Fail("Username atau password salah."),
+                        ApiResponse.Fail("Invalid username or password."),
                         statusCode: StatusCodes.Status401Unauthorized);
             })
             .AddEndpointFilter<ValidationFilter<LoginDto>>()
@@ -43,9 +43,9 @@ public static class AuthEndpoints
             {
                 var result = await service.RefreshTokenAsync(dto.RefreshToken);
                 return result is not null
-                    ? Results.Ok(ApiResponse<AuthResponseDto>.Ok(result, "Token berhasil diperbarui."))
+                    ? Results.Ok(ApiResponse<AuthResponseDto>.Ok(result, "Token refreshed successfully."))
                     : Results.Json(
-                        ApiResponse.Fail("Refresh token tidak valid atau sudah kedaluwarsa."),
+                        ApiResponse.Fail("Refresh token is invalid or has expired."),
                         statusCode: StatusCodes.Status401Unauthorized);
             })
             .AddEndpointFilter<ValidationFilter<RefreshRequestDto>>()
@@ -64,11 +64,11 @@ public static class AuthEndpoints
             async (RegisterDto dto, [FromServices] AuthService service) =>
             {
                 var result = await service.RegisterAsync(dto);
-                return Results.Ok(ApiResponse<AuthResponseDto>.Ok(result, "Registrasi berhasil."));
+                return Results.Created("/api/v2/auth/register", ApiResponse<AuthResponseDto>.Ok(result, "Registration successful."));
             })
             .AddEndpointFilter<ValidationFilter<RegisterDto>>()
             .WithName("RegisterV2")
-            .WithSummary("Registrasi user baru (v2)");
+            .WithSummary("Register a new user (v2)");
 
         // POST /api/v2/auth/login
         group.MapPost("/login",
@@ -76,9 +76,9 @@ public static class AuthEndpoints
             {
                 var result = await service.LoginAsync(dto);
                 return result is not null
-                    ? Results.Ok(ApiResponse<AuthResponseDto>.Ok(result, "Login berhasil."))
+                    ? Results.Ok(ApiResponse<AuthResponseDto>.Ok(result, "Login successful."))
                     : Results.Json(
-                        ApiResponse.Fail("Username atau password salah."),
+                        ApiResponse.Fail("Invalid username or password."),
                         statusCode: StatusCodes.Status401Unauthorized);
             })
             .AddEndpointFilter<ValidationFilter<LoginDto>>()
@@ -91,9 +91,9 @@ public static class AuthEndpoints
             {
                 var result = await service.RefreshTokenAsync(dto.RefreshToken);
                 return result is not null
-                    ? Results.Ok(ApiResponse<AuthResponseDto>.Ok(result, "Token berhasil diperbarui."))
+                    ? Results.Ok(ApiResponse<AuthResponseDto>.Ok(result, "Token refreshed successfully."))
                     : Results.Json(
-                        ApiResponse.Fail("Refresh token tidak valid atau sudah kedaluwarsa."),
+                        ApiResponse.Fail("Refresh token is invalid or has expired."),
                         statusCode: StatusCodes.Status401Unauthorized);
             })
             .AddEndpointFilter<ValidationFilter<RefreshRequestDto>>()

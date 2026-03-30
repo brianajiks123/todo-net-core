@@ -1,6 +1,6 @@
 # TodoApi
 
-A simple REST API for todo management built with **ASP.NET Core 10 Minimal API**, **Entity Framework Core**, and **SQLite**. Includes JWT authentication with refresh token support.
+A simple REST API for todo management built with **ASP.NET Core 10 Minimal API**, **Entity Framework Core**, and **SQLite**. Includes JWT authentication with refresh token support, API versioning, and rate limiting.
 
 ---
 
@@ -10,9 +10,9 @@ A simple REST API for todo management built with **ASP.NET Core 10 Minimal API**
 - Entity Framework Core 10 + SQLite
 - JWT Bearer Authentication (`Microsoft.AspNetCore.Authentication.JwtBearer`)
 - BCrypt.Net-Next (password hashing)
-- FluentValidation
-- AutoMapper
-- Swashbuckle (Swagger UI)
+- FluentValidation 12
+- AutoMapper 16
+- Swashbuckle (Swagger UI) 7
 
 ## Project Structure
 
@@ -23,6 +23,7 @@ TodoApi.Web/
 │   │   ├── User.cs                        # User entity
 │   │   ├── RefreshToken.cs                # Refresh token entity
 │   │   ├── AuthService.cs                 # Register, login, refresh logic
+│   │   ├── AuthEndpoints.cs               # Auth route handlers (v1 & v2)
 │   │   ├── Dtos.cs                        # Auth DTOs (Register, Login, AuthResponse, RefreshRequest)
 │   │   ├── Repositories/
 │   │   │   ├── IUserRepository.cs
@@ -34,10 +35,10 @@ TodoApi.Web/
 │   │       ├── RegisterDtoValidator.cs
 │   │       └── RefreshRequestDtoValidator.cs
 │   └── Todos/
-│       ├── Todo.cs                        # Entity model
+│       ├── Todo.cs                        # Entity model (with soft delete & audit trail)
 │       ├── TodoDbContext.cs               # EF Core DbContext
 │       ├── TodoService.cs                 # Business logic & queries
-│       ├── TodoEndpoints.cs               # Minimal API route handlers
+│       ├── TodoEndpoints.cs               # Minimal API route handlers (v1 & v2)
 │       ├── Dtos.cs                        # Request/Response DTOs
 │       ├── TodoQueryParams.cs             # Query params + PagedResult<T>
 │       ├── Filters/
@@ -54,7 +55,9 @@ TodoApi.Web/
 │           ├── CreateTodoDtoValidator.cs
 │           └── UpdateTodoDtoValidator.cs
 ├── Extensions/
-│   └── ServiceCollectionExtensions.cs    # DI extension methods
+│   ├── ServiceCollectionExtensions.cs    # DI extension methods
+│   ├── WebApplicationExtensions.cs       # Middleware & endpoint mapping
+│   └── RateLimitingExtensions.cs         # Rate limiting configuration
 ├── ApiResponse.cs                         # Standardized response envelope
 ├── Program.cs                             # App entry point & middleware
 ├── appsettings.json
@@ -81,8 +84,18 @@ On failure:
 ```json
 {
   "success": false,
-  "data": null,
   "message": "Error description"
+}
+```
+
+On validation failure (400 Bad Request):
+```json
+{
+  "success": false,
+  "message": "Validation failed.",
+  "errors": {
+    "fieldName": ["error message 1", "error message 2"]
+  }
 }
 ```
 
@@ -90,7 +103,7 @@ For endpoints that don't return data (e.g. DELETE), the non-generic `ApiResponse
 ```json
 {
   "success": true,
-  "message": "Todo berhasil dihapus."
+  "message": "Todo deleted successfully."
 }
 ```
 
@@ -109,7 +122,7 @@ The application reads configuration from `appsettings.json`, environment variabl
 | `Jwt__Secret` | Secret key for signing JWT tokens (min. 32 characters) | Yes |
 | `Jwt__Issuer` | JWT token issuer | No (default: `todo-api`) |
 | `Jwt__Audience` | JWT token audience | No (default: `todo-api`) |
-| `Jwt__ExpirationHours` | Access token expiration in hours | No (default: `24`) |
+| `Jwt__ExpirationHours` | Access token expiration in hours | No (default: `1`) |
 | `Jwt__RefreshExpirationDays` | Refresh token expiration in days | No (default: `7`) |
 
 > The application will **throw an exception** on startup if `Jwt__Secret` is not set.
@@ -128,7 +141,7 @@ dotnet user-secrets set "Jwt:Secret" "your-super-secret-key-minimum-32-chars" --
 # Optional: override other values
 dotnet user-secrets set "Jwt:Issuer" "todo-api" --project TodoApi.Web
 dotnet user-secrets set "Jwt:Audience" "todo-api" --project TodoApi.Web
-dotnet user-secrets set "Jwt:ExpirationHours" "24" --project TodoApi.Web
+dotnet user-secrets set "Jwt:ExpirationHours" "1" --project TodoApi.Web
 dotnet user-secrets set "Jwt:RefreshExpirationDays" "7" --project TodoApi.Web
 
 # List all stored secrets
@@ -161,7 +174,8 @@ dotnet run --project TodoApi.Web
     "Secret": "",
     "Issuer": "todo-api",
     "Audience": "todo-api",
-    "ExpirationHours": 24
+    "ExpirationHours": 1,
+    "RefreshExpirationDays": 7
   }
 }
 ```
@@ -234,16 +248,46 @@ Swagger UI: `http://localhost:5170/swagger` (Development only)
 
 ---
 
+## API Versioning
+
+This API exposes two versions with identical functionality. The key difference is that **v2 enforces rate limiting**.
+
+| Version | Base URL | Rate Limiting |
+|---------|----------|---------------|
+| v1 | `/api/v1` | No |
+| v2 | `/api/v2` | Yes — 100 req/min per IP |
+
+Both versions are documented in Swagger UI under separate tabs.
+
+---
+
+## Rate Limiting (v2 only)
+
+API v2 applies a **Fixed Window** rate limit per IP address:
+
+- Limit: **100 requests per minute**
+- Rejection status: `429 Too Many Requests`
+- Response includes `Retry-After: 60` header
+
+```json
+{
+  "success": false,
+  "message": "Too many requests. Maximum 100 requests per minute per IP. Please try again after 1 minute."
+}
+```
+
+---
+
 ## Authentication
 
-This API uses **JWT Bearer Authentication** with **Refresh Token** support. All `/api/todos` endpoints require a valid access token.
+This API uses **JWT Bearer Authentication** with **Refresh Token** support. All `/todos` endpoints require a valid access token.
 
 There is no default user — you must register first.
 
 ### Register
 
 ```http
-POST /api/auth/register
+POST /api/v1/auth/register
 Content-Type: application/json
 
 {
@@ -252,9 +296,9 @@ Content-Type: application/json
 }
 ```
 
-Constraints: username 3–50 chars, password min. 6 chars.
+Constraints: username 3–50 chars, password min. 8 chars.
 
-Response `200 OK`:
+Response `201 Created`:
 ```json
 {
   "success": true,
@@ -262,14 +306,14 @@ Response `200 OK`:
     "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
     "refreshToken": "base64-encoded-refresh-token..."
   },
-  "message": "Registrasi berhasil."
+  "message": "Registration successful."
 }
 ```
 
 ### Login
 
 ```http
-POST /api/auth/login
+POST /api/v1/auth/login
 Content-Type: application/json
 
 {
@@ -286,7 +330,7 @@ Response `200 OK`:
     "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
     "refreshToken": "base64-encoded-refresh-token..."
   },
-  "message": "Login berhasil."
+  "message": "Login successful."
 }
 ```
 
@@ -294,14 +338,14 @@ Response `401 Unauthorized` (wrong credentials):
 ```json
 {
   "success": false,
-  "message": "Username atau password salah."
+  "message": "Invalid username or password."
 }
 ```
 
 ### Refresh Token
 
 ```http
-POST /api/auth/refresh
+POST /api/v1/auth/refresh
 Content-Type: application/json
 
 {
@@ -317,7 +361,7 @@ Response `200 OK`:
     "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
     "refreshToken": "new-base64-encoded-refresh-token..."
   },
-  "message": "Token berhasil diperbarui."
+  "message": "Token refreshed successfully."
 }
 ```
 
@@ -325,9 +369,11 @@ Response `401 Unauthorized` (invalid/expired token):
 ```json
 {
   "success": false,
-  "message": "Refresh token tidak valid atau sudah kedaluwarsa."
+  "message": "Refresh token is invalid or has expired."
 }
 ```
+
+> When a refresh token is used, it is immediately **revoked** and a new one is issued.
 
 ### Using the Access Token
 
@@ -341,35 +387,35 @@ In Swagger UI, click **Authorize** and enter `Bearer <accessToken>`.
 
 ## API Endpoints
 
-Base URL: `/api`
+Base URL: `/api/v1` or `/api/v2`
 
 | Method | Endpoint               | Auth | Description                              |
 |--------|------------------------|------|------------------------------------------|
-| POST   | `/api/auth/register`   | No   | Register a new user                      |
-| POST   | `/api/auth/login`      | No   | Login and retrieve access + refresh token|
-| POST   | `/api/auth/refresh`    | No   | Refresh access token using refresh token |
-| GET    | `/api/todos`           | Yes  | List todos (pagination, search, sorting) |
-| GET    | `/api/todos/{id}`      | Yes  | Get a todo by ID                         |
-| POST   | `/api/todos`           | Yes  | Create a new todo                        |
-| PUT    | `/api/todos/{id}`      | Yes  | Update a todo                            |
-| DELETE | `/api/todos/{id}`      | Yes  | Delete a todo                            |
+| POST   | `/auth/register`       | No   | Register a new user                      |
+| POST   | `/auth/login`          | No   | Login and retrieve access + refresh token|
+| POST   | `/auth/refresh`        | No   | Refresh access token using refresh token |
+| GET    | `/todos`               | Yes  | List todos (pagination, search, sorting) |
+| GET    | `/todos/{id}`          | Yes  | Get a todo by ID                         |
+| POST   | `/todos`               | Yes  | Create a new todo                        |
+| PUT    | `/todos/{id}`          | Yes  | Update a todo                            |
+| DELETE | `/todos/{id}`          | Yes  | Soft-delete a todo                       |
 
 > Each user can only access their own todos. Todos are scoped to the authenticated user.
 
 ---
 
-### GET /api/todos
+### GET /todos
 
 Query Parameters:
 
-| Parameter | Type   | Default | Description                                           |
-|-----------|--------|---------|-------------------------------------------------------|
-| `page`    | int    | 1       | Page number (min: 1)                                  |
-| `size`    | int    | 10      | Items per page (1–50)                                 |
-| `search`  | string | -       | Filter by title (case-insensitive)                    |
-| `sort`    | string | -       | Sort by `title`, `createdat`, `iscompleted` + `:desc` |
+| Parameter | Type   | Default | Description                                                    |
+|-----------|--------|---------|----------------------------------------------------------------|
+| `page`    | int    | 1       | Page number (min: 1)                                           |
+| `size`    | int    | 10      | Items per page (1–50)                                          |
+| `search`  | string | -       | Filter by title (case-insensitive)                             |
+| `sort`    | string | -       | Sort by `title`, `createdat`, `iscompleted`, append `:desc` for descending |
 
-Example: `GET /api/todos?page=1&size=5&search=milk&sort=createdat:desc`
+Example: `GET /api/v1/todos?page=1&size=5&search=milk&sort=createdat:desc`
 
 Response `200 OK`:
 ```json
@@ -377,7 +423,15 @@ Response `200 OK`:
   "success": true,
   "data": {
     "items": [
-      { "id": 1, "title": "Buy milk", "isCompleted": false, "createdAt": "2026-03-25T00:00:00Z" }
+      {
+        "id": 1,
+        "title": "Buy milk",
+        "isCompleted": false,
+        "createdAt": "2026-03-25T00:00:00Z",
+        "createdBy": 1,
+        "updatedBy": 1,
+        "updatedAt": "2026-03-25T00:00:00Z"
+      }
     ],
     "page": 1,
     "size": 10,
@@ -392,13 +446,21 @@ Response `200 OK`:
 
 ---
 
-### GET /api/todos/{id}
+### GET /todos/{id}
 
 Response `200 OK`:
 ```json
 {
   "success": true,
-  "data": { "id": 1, "title": "Buy milk", "isCompleted": false, "createdAt": "2026-03-25T00:00:00Z" },
+  "data": {
+    "id": 1,
+    "title": "Buy milk",
+    "isCompleted": false,
+    "createdAt": "2026-03-25T00:00:00Z",
+    "createdBy": 1,
+    "updatedBy": 1,
+    "updatedAt": "2026-03-25T00:00:00Z"
+  },
   "message": null
 }
 ```
@@ -407,13 +469,13 @@ Response `404 Not Found`:
 ```json
 {
   "success": false,
-  "message": "Todo dengan ID 1 tidak ditemukan."
+  "message": "Todo with ID 1 not found."
 }
 ```
 
 ---
 
-### POST /api/todos
+### POST /todos
 
 Request body:
 ```json
@@ -426,14 +488,22 @@ Response `201 Created`:
 ```json
 {
   "success": true,
-  "data": { "id": 3, "title": "Buy milk", "isCompleted": false, "createdAt": "2026-03-25T00:00:00Z" },
-  "message": "Todo berhasil dibuat."
+  "data": {
+    "id": 3,
+    "title": "Buy milk",
+    "isCompleted": false,
+    "createdAt": "2026-03-25T00:00:00Z",
+    "createdBy": 1,
+    "updatedBy": 1,
+    "updatedAt": "2026-03-25T00:00:00Z"
+  },
+  "message": "Todo created successfully."
 }
 ```
 
 ---
 
-### PUT /api/todos/{id}
+### PUT /todos/{id}
 
 All fields are optional (partial update):
 ```json
@@ -449,8 +519,16 @@ Response `200 OK`:
 ```json
 {
   "success": true,
-  "data": { "id": 1, "title": "Buy UHT milk", "isCompleted": true, "createdAt": "2026-03-25T00:00:00Z" },
-  "message": "Todo berhasil diperbarui."
+  "data": {
+    "id": 1,
+    "title": "Buy UHT milk",
+    "isCompleted": true,
+    "createdAt": "2026-03-25T00:00:00Z",
+    "createdBy": 1,
+    "updatedBy": 1,
+    "updatedAt": "2026-03-25T12:00:00Z"
+  },
+  "message": "Todo updated successfully."
 }
 ```
 
@@ -458,7 +536,7 @@ Response `404 Not Found`:
 ```json
 {
   "success": false,
-  "message": "Todo dengan ID 1 tidak ditemukan."
+  "message": "Todo with ID 1 not found."
 }
 ```
 
@@ -466,19 +544,21 @@ Response `400 Bad Request` (empty title):
 ```json
 {
   "success": false,
-  "message": "Judul tidak boleh kosong."
+  "message": "Title must not be empty."
 }
 ```
 
 ---
 
-### DELETE /api/todos/{id}
+### DELETE /todos/{id}
+
+Performs a **soft delete** — the record is marked as deleted (`IsDeleted = true`) and excluded from all queries, but not physically removed from the database.
 
 Response `200 OK`:
 ```json
 {
   "success": true,
-  "message": "Todo berhasil dihapus."
+  "message": "Todo deleted successfully."
 }
 ```
 
@@ -486,7 +566,7 @@ Response `404 Not Found`:
 ```json
 {
   "success": false,
-  "message": "Todo dengan ID 1 tidak ditemukan."
+  "message": "Todo with ID 1 not found."
 }
 ```
 
@@ -499,13 +579,37 @@ Unhandled exceptions are returned in [RFC 9457 ProblemDetails](https://www.rfc-e
 ```json
 {
   "type": "https://httpstatuses.com/500",
-  "title": "Terjadi kesalahan internal server",
+  "title": "An internal server error occurred.",
   "status": 500,
   "detail": "...",
-  "instance": "POST /api/todos",
+  "instance": "POST /api/v1/todos",
   "traceId": "...",
   "timestamp": "2026-03-25T00:00:00Z"
 }
 ```
 
 In Development mode, the response also includes `exceptionType` to aid debugging.
+
+HTTP error responses (4xx/5xx without an unhandled exception) are returned as `ApiResponse` with a descriptive message.
+
+---
+
+## Database Migrations
+
+The project uses EF Core migrations with SQLite.
+
+```bash
+# Apply all pending migrations
+dotnet ef database update --project TodoApi.Web
+
+# Add a new migration
+dotnet ef migrations add <MigrationName> --project TodoApi.Web
+```
+
+Applied migrations:
+
+| Migration | Description |
+|-----------|-------------|
+| `20260325031127_AddUserOwnershipToTodos` | Add `UserId` FK to todos |
+| `20260325073704_AddSoftDeleteToTodo` | Add `IsDeleted` flag |
+| `20260325082755_AddAuditTrailToTodo` | Add `CreatedBy`, `UpdatedBy`, `UpdatedAt` |

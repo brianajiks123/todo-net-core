@@ -15,9 +15,9 @@ public class CreateTodoDtoValidator : AbstractValidator<CreateTodoDto>
         _httpContextAccessor = httpContextAccessor;
 
         RuleFor(x => x.Title)
-            .NotEmpty().WithMessage("Judul todo wajib diisi")
+            .NotEmpty().WithMessage("Todo title is required.")
             .Must(title => !string.IsNullOrWhiteSpace(title?.Trim()))
-                .WithMessage("Judul tidak boleh hanya whitespace")
+                .WithMessage("Title must not be whitespace only.")
             .MinimumLength(1)
             .MaximumLength(200);
 
@@ -28,7 +28,7 @@ public class CreateTodoDtoValidator : AbstractValidator<CreateTodoDto>
                 var userId = GetCurrentUserId();
                 return !await _unitOfWork.Todos.ExistsWithTitleAsync(title, userId, ct);
             })
-            .WithMessage("Judul sudah ada");
+            .WithMessage("A todo with this title already exists.");
     }
 
     private int GetCurrentUserId()
@@ -37,7 +37,7 @@ public class CreateTodoDtoValidator : AbstractValidator<CreateTodoDto>
         var userIdClaim = claimsPrincipal?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
 
         if (string.IsNullOrEmpty(userIdClaim) || !int.TryParse(userIdClaim, out int userId))
-            throw new InvalidOperationException("User ID tidak ditemukan di token.");
+            throw new InvalidOperationException("User ID not found in token.");
 
         return userId;
     }

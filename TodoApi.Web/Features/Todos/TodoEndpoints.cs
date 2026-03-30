@@ -22,7 +22,7 @@ public static class TodoEndpoints
                 return Results.Ok(ApiResponse<PagedResult<TodoResponseDto>>.Ok(result));
             })
             .WithName("GetTodosV1")
-            .WithSummary("Daftar todo dengan pagination (v1)");
+            .WithSummary("Get paginated todo list (v1)");
 
         // GET /api/v1/todos/{id}
         group.MapGet("/{id:int}",
@@ -32,10 +32,10 @@ public static class TodoEndpoints
                 var todo = await service.GetById(id, userId);
                 return todo is not null
                     ? Results.Ok(ApiResponse<TodoResponseDto>.Ok(todo))
-                    : Results.NotFound(ApiResponse.Fail($"Todo dengan ID {id} tidak ditemukan."));
+                    : Results.NotFound(ApiResponse.Fail($"Todo with ID {id} not found."));
             })
             .WithName("GetTodoByIdV1")
-            .WithSummary("Detail todo (v1)");
+            .WithSummary("Get todo by ID (v1)");
 
         // POST /api/v1/todos
         group.MapPost("/",
@@ -45,11 +45,11 @@ public static class TodoEndpoints
                 var created = await service.Create(dto.Title.Trim(), userId);
                 return Results.Created(
                     $"/api/v1/todos/{created.Id}",
-                    ApiResponse<TodoResponseDto>.Ok(created, "Todo berhasil dibuat."));
+                    ApiResponse<TodoResponseDto>.Ok(created, "Todo created successfully."));
             })
             .AddEndpointFilter<ValidationFilter<CreateTodoDto>>()
             .WithName("CreateTodoV1")
-            .WithSummary("Buat todo baru (v1)");
+            .WithSummary("Create a new todo (v1)");
 
         // PUT /api/v1/todos/{id}
         group.MapPut("/{id:int}",
@@ -59,15 +59,15 @@ public static class TodoEndpoints
                 var result = await service.Update(id, dto.Title?.Trim(), dto.IsCompleted, userId);
                 return result.Result switch
                 {
-                    UpdateResult.Success      => Results.Ok(ApiResponse<TodoResponseDto>.Ok(result.Data!, "Todo berhasil diperbarui.")),
-                    UpdateResult.NotFound     => Results.NotFound(ApiResponse.Fail($"Todo dengan ID {id} tidak ditemukan.")),
-                    UpdateResult.InvalidTitle => Results.BadRequest(ApiResponse.Fail("Judul tidak boleh kosong.")),
-                    _                         => Results.Json(ApiResponse.Fail("Terjadi kesalahan internal."), statusCode: 500)
+                    UpdateResult.Success      => Results.Ok(ApiResponse<TodoResponseDto>.Ok(result.Data!, "Todo updated successfully.")),
+                    UpdateResult.NotFound     => Results.NotFound(ApiResponse.Fail($"Todo with ID {id} not found.")),
+                    UpdateResult.InvalidTitle => Results.BadRequest(ApiResponse.Fail("Title must not be empty.")),
+                    _                         => Results.Json(ApiResponse.Fail("An internal error occurred."), statusCode: 500)
                 };
             })
             .AddEndpointFilter<ValidationFilter<UpdateTodoDto>>()
             .WithName("UpdateTodoV1")
-            .WithSummary("Perbarui todo (v1)");
+            .WithSummary("Update a todo (v1)");
 
         // DELETE /api/v1/todos/{id}
         group.MapDelete("/{id:int}",
@@ -76,11 +76,11 @@ public static class TodoEndpoints
                 var userId = int.Parse(user.FindFirstValue(ClaimTypes.NameIdentifier)!);
                 var deleted = await service.Delete(id, userId);
                 return deleted
-                    ? Results.Ok(ApiResponse.Ok("Todo berhasil dihapus."))
-                    : Results.NotFound(ApiResponse.Fail($"Todo dengan ID {id} tidak ditemukan."));
+                    ? Results.Ok(ApiResponse.Ok("Todo deleted successfully."))
+                    : Results.NotFound(ApiResponse.Fail($"Todo with ID {id} not found."));
             })
             .WithName("DeleteTodoV1")
-            .WithSummary("Hapus todo (v1)");
+            .WithSummary("Delete a todo (v1)");
     }
 
     // Version 2
@@ -99,7 +99,7 @@ public static class TodoEndpoints
                 return Results.Ok(ApiResponse<PagedResult<TodoResponseDto>>.Ok(result));
             })
             .WithName("GetTodosV2")
-            .WithSummary("Daftar todo dengan pagination (v2)");
+            .WithSummary("Get paginated todo list (v2)");
 
         // GET /api/v2/todos/{id}
         group.MapGet("/{id:int}",
@@ -109,10 +109,10 @@ public static class TodoEndpoints
                 var todo = await service.GetById(id, userId);
                 return todo is not null
                     ? Results.Ok(ApiResponse<TodoResponseDto>.Ok(todo))
-                    : Results.NotFound(ApiResponse.Fail($"Todo dengan ID {id} tidak ditemukan."));
+                    : Results.NotFound(ApiResponse.Fail($"Todo with ID {id} not found."));
             })
             .WithName("GetTodoByIdV2")
-            .WithSummary("Detail todo (v2)");
+            .WithSummary("Get todo by ID (v2)");
 
         // POST /api/v2/todos
         group.MapPost("/",
@@ -122,11 +122,11 @@ public static class TodoEndpoints
                 var created = await service.Create(dto.Title.Trim(), userId);
                 return Results.Created(
                     $"/api/v2/todos/{created.Id}",
-                    ApiResponse<TodoResponseDto>.Ok(created, "Todo berhasil dibuat."));
+                    ApiResponse<TodoResponseDto>.Ok(created, "Todo created successfully."));
             })
             .AddEndpointFilter<ValidationFilter<CreateTodoDto>>()
             .WithName("CreateTodoV2")
-            .WithSummary("Buat todo baru (v2)");
+            .WithSummary("Create a new todo (v2)");
 
         // PUT /api/v2/todos/{id}
         group.MapPut("/{id:int}",
@@ -136,15 +136,15 @@ public static class TodoEndpoints
                 var result = await service.Update(id, dto.Title?.Trim(), dto.IsCompleted, userId);
                 return result.Result switch
                 {
-                    UpdateResult.Success      => Results.Ok(ApiResponse<TodoResponseDto>.Ok(result.Data!, "Todo berhasil diperbarui.")),
-                    UpdateResult.NotFound     => Results.NotFound(ApiResponse.Fail($"Todo dengan ID {id} tidak ditemukan.")),
-                    UpdateResult.InvalidTitle => Results.BadRequest(ApiResponse.Fail("Judul tidak boleh kosong.")),
-                    _                         => Results.Json(ApiResponse.Fail("Terjadi kesalahan internal."), statusCode: 500)
+                    UpdateResult.Success      => Results.Ok(ApiResponse<TodoResponseDto>.Ok(result.Data!, "Todo updated successfully.")),
+                    UpdateResult.NotFound     => Results.NotFound(ApiResponse.Fail($"Todo with ID {id} not found.")),
+                    UpdateResult.InvalidTitle => Results.BadRequest(ApiResponse.Fail("Title must not be empty.")),
+                    _                         => Results.Json(ApiResponse.Fail("An internal error occurred."), statusCode: 500)
                 };
             })
             .AddEndpointFilter<ValidationFilter<UpdateTodoDto>>()
             .WithName("UpdateTodoV2")
-            .WithSummary("Perbarui todo (v2)");
+            .WithSummary("Update a todo (v2)");
 
         // DELETE /api/v2/todos/{id}
         group.MapDelete("/{id:int}",
@@ -153,10 +153,10 @@ public static class TodoEndpoints
                 var userId = int.Parse(user.FindFirstValue(ClaimTypes.NameIdentifier)!);
                 var deleted = await service.Delete(id, userId);
                 return deleted
-                    ? Results.Ok(ApiResponse.Ok("Todo berhasil dihapus."))
-                    : Results.NotFound(ApiResponse.Fail($"Todo dengan ID {id} tidak ditemukan."));
+                    ? Results.Ok(ApiResponse.Ok("Todo deleted successfully."))
+                    : Results.NotFound(ApiResponse.Fail($"Todo with ID {id} not found."));
             })
             .WithName("DeleteTodoV2")
-            .WithSummary("Hapus todo (v2)");
+            .WithSummary("Delete a todo (v2)");
     }
 }

@@ -63,7 +63,7 @@ public class AuthService
     {
         var jwtSection = _configuration.GetSection("Jwt");
         var secret = jwtSection["Secret"] 
-            ?? throw new InvalidOperationException("JWT Secret tidak ditemukan. Set dengan: dotnet user-secrets set Jwt:Secret \"your-very-long-secret-min-32-chars\"");
+            ?? throw new InvalidOperationException("JWT Secret not found. Set it with: dotnet user-secrets set Jwt:Secret \"your-very-long-secret-min-32-chars\"");
 
         var issuer = jwtSection["Issuer"] ?? "todo-api";
         var audience = jwtSection["Audience"] ?? "todo-api";

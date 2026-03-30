@@ -35,7 +35,7 @@ public static class RateLimitingExtensions
                 context.HttpContext.Response.Headers["Retry-After"] = "60";
 
                 var response = ApiResponse.Fail(
-                    "Too many request. Max 100 request per minute per IP. Please, try again after 1 minute.");
+                    "Too many requests. Maximum 100 requests per minute per IP. Please try again after 1 minute.");
 
                 await context.HttpContext.Response.WriteAsync(
                     System.Text.Json.JsonSerializer.Serialize(response), 

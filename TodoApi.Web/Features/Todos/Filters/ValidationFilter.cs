@@ -28,7 +28,7 @@ public class ValidationFilter<T> : IEndpointFilter where T : class
                     g => g.Select(e => e.ErrorMessage).ToArray());
 
             return Results.Json(
-                new { success = false, message = "Validasi gagal.", errors },
+                new { success = false, message = "Validation failed.", errors },
                 statusCode: StatusCodes.Status400BadRequest);
         }
 

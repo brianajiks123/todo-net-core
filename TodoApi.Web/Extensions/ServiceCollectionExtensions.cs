@@ -111,7 +111,7 @@ public static class ServiceCollectionExtensions
                         context.Response.StatusCode = StatusCodes.Status401Unauthorized;
                         context.Response.ContentType = "application/json";
                         var message = string.IsNullOrEmpty(context.ErrorDescription)
-                            ? "Access is rejected. Token is not valid or not found."
+                            ? "Unauthorized. Token is invalid or not provided."
                             : context.ErrorDescription;
                         await context.Response.WriteAsync(JsonSerializer.Serialize(ApiResponse.Fail(message)));
                     },
@@ -120,7 +120,7 @@ public static class ServiceCollectionExtensions
                         context.Response.StatusCode = StatusCodes.Status403Forbidden;
                         context.Response.ContentType = "application/json";
                         await context.Response.WriteAsync(JsonSerializer.Serialize(
-                            ApiResponse.Fail("You are not allowed to access the resource.")));
+                            ApiResponse.Fail("You do not have permission to access this resource.")));
                     }
                 };
             });
