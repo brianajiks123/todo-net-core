@@ -54,6 +54,7 @@ TodoApi.Web/
 │       │   └── UnitOfWork.cs
 │       └── Validators/
 │           ├── CreateTodoDtoValidator.cs
+│           ├── CreateTodoDtoV2Validator.cs
 │           └── UpdateTodoDtoValidator.cs
 ├── Extensions/
 │   ├── ServiceCollectionExtensions.cs    # DI extension methods
@@ -440,12 +441,12 @@ kubectl apply -f k8s/deployment.yaml -n todoapi-dev
 
 ## API Versioning
 
-This API exposes two versions with identical functionality. The key difference is that **v2 enforces rate limiting**.
+This API exposes two versions. The key differences are that **v2 enforces rate limiting** and supports additional fields like `dueDate` on todo creation.
 
-| Version | Base URL | Rate Limiting |
-|---------|----------|---------------|
-| v1 | `/api/v1` | No |
-| v2 | `/api/v2` | Yes — 100 req/min per IP |
+| Version | Base URL | Rate Limiting | DueDate Support |
+|---------|----------|---------------|-----------------|
+| v1 | `/api/v1` | No | No |
+| v2 | `/api/v2` | Yes — 100 req/min per IP | Yes |
 
 Both versions are documented in Swagger UI under separate tabs.
 
@@ -667,12 +668,22 @@ Response `404 Not Found`:
 
 ### POST /todos
 
-Request body:
+Request body (v1):
 ```json
 { "title": "Buy milk" }
 ```
 
-Constraints: title 1–200 characters.
+Request body (v2 — supports optional `dueDate`):
+```json
+{
+  "title": "Buy milk",
+  "dueDate": "2026-04-01T10:00:00+07:00"
+}
+```
+
+Constraints:
+- `title`: 1–200 characters, required
+- `dueDate` (v2 only): must be in the future, accepts any timezone offset (e.g. `+07:00`), stored as UTC
 
 Response `201 Created`:
 ```json
@@ -685,9 +696,21 @@ Response `201 Created`:
     "createdAt": "2026-03-25T00:00:00Z",
     "createdBy": 1,
     "updatedBy": 1,
-    "updatedAt": "2026-03-25T00:00:00Z"
+    "updatedAt": "2026-03-25T00:00:00Z",
+    "dueDate": "2026-04-01T03:00:00Z"
   },
   "message": "Todo created successfully."
+}
+```
+
+Response `400 Bad Request` (due date in the past):
+```json
+{
+  "success": false,
+  "message": "Validation failed.",
+  "errors": {
+    "DueDate": ["Due date must be in the future."]
+  }
 }
 ```
 
@@ -816,6 +839,33 @@ Log files are written using a custom `JsonArrayFileSink` that produces valid JSO
 
 ---
 
+## Background Services
+
+### ReminderService
+
+A hosted background service that runs every **5 minutes** and checks for overdue todos. A todo is considered overdue when:
+- `IsCompleted = false`
+- `IsDeleted = false`
+- `DueDate` is set and has passed (compared in UTC)
+
+Overdue todos are logged as warnings:
+
+```
+REMINDER - OVERDUE TODO: Id=5, User=john, Title='Buy milk', DueDate=2026-04-01 03:00 UTC
+```
+
+#### Testing Overdue Todos
+
+Since the API validates that `dueDate` must be in the future, insert a test record directly via SQLite:
+
+```bash
+sqlite3 TodoApi.Web/todos.db "INSERT INTO Todos (Title, IsCompleted, CreatedAt, CreatedBy, UpdatedBy, UpdatedAt, IsDeleted, UserId, DueDate) VALUES ('Overdue Test', 0, datetime('now'), 1, 1, datetime('now'), 0, 1, datetime('now', '-1 hour'));"
+```
+
+The warning will appear in logs within the next 5-minute check cycle. To speed up testing, temporarily change `_interval` in `ReminderService.cs` to `TimeSpan.FromSeconds(10)`.
+
+---
+
 ## Error Handling
 
 Unhandled exceptions are returned in [RFC 9457 ProblemDetails](https://www.rfc-editor.org/rfc/rfc9457) format:
@@ -857,3 +907,4 @@ Applied migrations:
 | `20260325031127_AddUserOwnershipToTodos` | Add `UserId` FK to todos |
 | `20260325073704_AddSoftDeleteToTodo` | Add `IsDeleted` flag |
 | `20260325082755_AddAuditTrailToTodo` | Add `CreatedBy`, `UpdatedBy`, `UpdatedAt` |
+| `20260331131832_AddDueDateToTodo` | Add `DueDate` (nullable) to todos |
