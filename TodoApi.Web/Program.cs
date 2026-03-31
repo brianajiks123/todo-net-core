@@ -25,6 +25,34 @@ builder.Services.AddTodoServices();
 builder.Services.AddJwtAuthentication(builder.Configuration);
 builder.Services.AddCustomProblemDetails();
 builder.Services.AddCustomRateLimiting();
+
+var allowedOrigins = builder.Configuration
+    .GetSection("Cors:AllowedOrigins")
+    .Get<string[]>() ?? [];
+
+if (!builder.Environment.IsDevelopment() && allowedOrigins.Length == 0)
+    throw new InvalidOperationException("CORS allowed origins must be configured for non-development environments. Set 'Cors__AllowedOrigins__0', 'Cors__AllowedOrigins__1', etc. as environment variables.");
+
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowFrontend", policy =>
+    {
+        if (builder.Environment.IsDevelopment())
+        {
+            policy.WithOrigins(allowedOrigins)
+                  .AllowAnyHeader()
+                  .AllowAnyMethod();
+        }
+        else
+        {
+            policy.WithOrigins(allowedOrigins)
+                  .AllowAnyHeader()
+                  .AllowAnyMethod()
+                  .AllowCredentials();
+        }
+    });
+});
+
 builder.Services.AddHealthChecks()
     // Liveness
     .AddCheck("self", () => Microsoft.Extensions.Diagnostics.HealthChecks.HealthCheckResult.Healthy(), tags: ["liveness"])
@@ -36,6 +64,8 @@ builder.Services.AddHealthChecks()
 var app = builder.Build();
 
 // Middleware
+app.UseCors("AllowFrontend");
+
 if (app.Environment.IsDevelopment())
 {
     app.UseStaticFiles();
@@ -88,6 +118,7 @@ app.UseWhen(ctx => ctx.Request.Path.StartsWithSegments("/api/v2"), v2App =>
 
 app.UseGlobalExceptionHandler();
 app.UseHttpErrorResponses();
+app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseRateLimiter();

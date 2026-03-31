@@ -205,6 +205,79 @@ services:
 
 ---
 
+## CORS Configuration
+
+CORS origins are configured per environment. Development origins are defined in `appsettings.Development.json`. Production and staging origins must be set via environment variables — the app will **throw an exception** on startup if no origins are configured in non-development environments.
+
+### Development
+
+Origins are read from `appsettings.Development.json`:
+
+```json
+{
+  "Cors": {
+    "AllowedOrigins": [
+      "http://localhost:3000",
+      "http://localhost:5173"
+    ]
+  }
+}
+```
+
+In development, credentials are not required (`AllowCredentials` is not set).
+
+### Production / Staging
+
+Set origins via environment variables using ASP.NET Core's double-underscore array syntax:
+
+**Linux / macOS:**
+```bash
+export Cors__AllowedOrigins__0=https://todo-app.yourdomain.com
+export Cors__AllowedOrigins__1=https://staging-todo.yourdomain.com
+```
+
+**Windows PowerShell:**
+```powershell
+$env:Cors__AllowedOrigins__0 = "https://todo-app.yourdomain.com"
+$env:Cors__AllowedOrigins__1 = "https://staging-todo.yourdomain.com"
+```
+
+**Docker Compose:**
+```yaml
+environment:
+  - Cors__AllowedOrigins__0=https://todo-app.yourdomain.com
+  - Cors__AllowedOrigins__1=https://staging-todo.yourdomain.com
+```
+
+**Kubernetes:**
+```yaml
+env:
+  - name: Cors__AllowedOrigins__0
+    value: "https://todo-app.yourdomain.com"
+  - name: Cors__AllowedOrigins__1
+    value: "https://staging-todo.yourdomain.com"
+```
+
+In production, `AllowCredentials()` is enabled — origins must use `https` and cannot be wildcards.
+
+### Testing CORS
+
+```bash
+# Preflight request — origin diizinkan
+curl -X OPTIONS http://localhost:5170/api/v1/todos \
+  -H "Origin: http://localhost:3000" \
+  -H "Access-Control-Request-Method: GET" \
+  -H "Access-Control-Request-Headers: Authorization" \
+  -v
+
+# Expected response headers:
+# Access-Control-Allow-Origin: http://localhost:3000
+# Access-Control-Allow-Methods: GET
+# Access-Control-Allow-Headers: Authorization
+```
+
+---
+
 ### Configuration Priority
 
 1. `appsettings.json`

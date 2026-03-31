@@ -1,8 +1,6 @@
 namespace TodoApi.Web;
 
-/// <summary>
-/// Standard Envelope for all API response.
-/// </summary>
+// Standard Envelope for all API response.
 public record ApiResponse<T>
 {
     public bool Success { get; init; }
