@@ -6,7 +6,6 @@ using System.Security.Cryptography;
 using System.Text;
 using TodoApi.Web.Features.Auth.Repositories;
 using TodoApi.Web.Features.Todos;
-
 using static BCrypt.Net.BCrypt;
 
 namespace TodoApi.Web.Features.Auth;

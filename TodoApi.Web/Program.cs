@@ -5,6 +5,7 @@ using System.Security.Claims;
 using System.Text.RegularExpressions;
 using TodoApi.Web;
 using TodoApi.Web.Extensions;
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Serilog configuration (Structured + Console + File JSON)
