@@ -24,11 +24,28 @@ public class TodoService
         return todo is null ? null : _mapper.Map<TodoResponseDto>(todo);
     }
 
+    // v1
     public async Task<TodoResponseDto> Create(string title, int userId)
     {
         var dto = new CreateTodoDto(title.Trim());
         var todo = _mapper.Map<Todo>(dto);
         
+        todo.UserId = userId;
+        todo.CreatedBy = userId;
+        todo.UpdatedBy = userId;
+        todo.UpdatedAt = DateTime.UtcNow;
+
+        await _unitOfWork.Todos.AddAsync(todo);
+        await _unitOfWork.SaveChangesAsync();
+
+        return _mapper.Map<TodoResponseDto>(todo);
+    }
+
+    // v2
+    public async Task<TodoResponseDto> CreateV2(CreateTodoDtoV2 dto, int userId)
+    {
+        var todo = _mapper.Map<Todo>(dto);
+
         todo.UserId = userId;
         todo.CreatedBy = userId;
         todo.UpdatedBy = userId;

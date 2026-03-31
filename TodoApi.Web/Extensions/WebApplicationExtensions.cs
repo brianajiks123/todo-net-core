@@ -46,6 +46,7 @@ public static class WebApplicationExtensions
             await next();
 
             if (context.Response.HasStarted) return;
+            if (context.Items.ContainsKey("ValidationHandled")) return;
 
             string? message = context.Response.StatusCode switch
             {

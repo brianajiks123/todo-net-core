@@ -12,6 +12,7 @@ public class Todo
     public bool IsDeleted { get; set; } = false;
     public int UserId { get; set; }
     public User User { get; set; } = null!;
+    public DateTime? DueDate { get; set; }
 
     public Todo() { }
 

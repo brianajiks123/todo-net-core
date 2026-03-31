@@ -5,6 +5,7 @@ using System.Security.Claims;
 using System.Text.RegularExpressions;
 using TodoApi.Web;
 using TodoApi.Web.Extensions;
+using TodoApi.Web.BackgroundServices;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -23,6 +24,7 @@ builder.Services.AddValidation();
 builder.Services.AddDbContext<TodoDbContext>(options =>
     options.UseSqlite("Data Source=todos.db"));
 builder.Services.AddTodoServices();
+builder.Services.AddHostedService<ReminderService>();
 builder.Services.AddJwtAuthentication(builder.Configuration);
 builder.Services.AddCustomProblemDetails();
 builder.Services.AddCustomRateLimiting();

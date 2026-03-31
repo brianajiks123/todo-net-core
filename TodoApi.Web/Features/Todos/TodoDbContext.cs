@@ -31,6 +31,9 @@ public class TodoDbContext : DbContext
                 .IsRequired()
                 .HasDefaultValue(false);
 
+            entity.Property(t => t.DueDate)
+                .HasColumnType("datetime");
+
             entity.HasQueryFilter(t => !t.IsDeleted);
 
             entity.HasOne(t => t.User)

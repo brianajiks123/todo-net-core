@@ -21,6 +21,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<TodoService>();
         services.AddScoped<AuthService>();
         services.AddValidatorsFromAssemblyContaining<CreateTodoDtoValidator>();
+        services.AddValidatorsFromAssemblyContaining<CreateTodoDtoV2Validator>();
         services.AddAutoMapper(cfg => { }, typeof(TodoProfile));
         services.AddHttpContextAccessor();
         return services;

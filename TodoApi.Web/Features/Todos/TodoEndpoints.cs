@@ -116,15 +116,15 @@ public static class TodoEndpoints
 
         // POST /api/v2/todos
         group.MapPost("/",
-            async (CreateTodoDto dto, ClaimsPrincipal user, [FromServices] TodoService service) =>
+            async (CreateTodoDtoV2 dto, ClaimsPrincipal user, [FromServices] TodoService service) =>
             {
                 var userId = int.Parse(user.FindFirstValue(ClaimTypes.NameIdentifier)!);
-                var created = await service.Create(dto.Title.Trim(), userId);
+                var created = await service.CreateV2(dto, userId);
                 return Results.Created(
                     $"/api/v2/todos/{created.Id}",
                     ApiResponse<TodoResponseDto>.Ok(created, "Todo created successfully."));
             })
-            .AddEndpointFilter<ValidationFilter<CreateTodoDto>>()
+            .AddEndpointFilter<ValidationFilter<CreateTodoDtoV2>>()
             .WithName("CreateTodoV2")
             .WithSummary("Create a new todo (v2)");
 

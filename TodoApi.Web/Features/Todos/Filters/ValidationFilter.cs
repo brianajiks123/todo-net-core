@@ -27,6 +27,8 @@ public class ValidationFilter<T> : IEndpointFilter where T : class
                     g => g.Key,
                     g => g.Select(e => e.ErrorMessage).ToArray());
 
+            context.HttpContext.Items["ValidationHandled"] = true;
+
             return Results.Json(
                 new { success = false, message = "Validation failed.", errors },
                 statusCode: StatusCodes.Status400BadRequest);
