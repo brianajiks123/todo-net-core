@@ -41,10 +41,7 @@ logs/
 # Credentials & Secrets
 # ─────────────────────────────────────────
 
-# Environment-specific appsettings (may contain secrets/connection strings)
-# appsettings.json itself should be tracked as a template (without real secrets)
 appsettings.Development.json
-appsettings.Production.json
 appsettings.Staging.json
 appsettings.Local.json
 
@@ -98,5 +95,5 @@ coverage/
 *.coveragexml
 *.trx
 
-# Migrations (uncomment if you want to exclude)
+# Migrations (uncomment jika ingin exclude)
 # **/Migrations/

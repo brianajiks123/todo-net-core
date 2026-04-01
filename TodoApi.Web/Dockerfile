@@ -9,30 +9,35 @@ RUN dotnet restore
 # Copy all source code
 COPY . .
 
-# Publish app to folder /app/publish
+# Publish to /app/publish
 RUN dotnet publish -c Release -o /app/publish --no-restore
 
 # ==================== Stage 2: Runtime (Final Image) ====================
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
 
-# Create user non-root for safety
+# Install wget for healthcheck (curl is not exist in the base image)
+USER root
+RUN apt-get update && apt-get install -y --no-install-recommends wget \
+    && rm -rf /var/lib/apt/lists/*
+
+# Running as non-root user
 RUN adduser --disabled-password --gecos "" appuser
 USER appuser
 
 WORKDIR /app
 
-# Copy result of publish from previous stage
+# Copy result of publish fro previous stage
 COPY --from=build /app/publish .
 
-# Expose port app (.NET 8+ default 8080)
+# Port default .NET 8+
 EXPOSE 8080
 
-# Environment variable
+# Environment variables
 ENV ASPNETCORE_URLS=http://+:8080
 ENV ASPNETCORE_ENVIRONMENT=Production
 
-# Healthcheck in Docker level
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-  CMD curl -f http://localhost:8080/api/v2/health/liveness || exit 1
+# Healthcheck using wget (available in Debian-based aspnet image)
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
+  CMD wget -qO- http://localhost:8080/api/v2/health/liveness || exit 1
 
 ENTRYPOINT ["dotnet", "TodoApi.Web.dll"]

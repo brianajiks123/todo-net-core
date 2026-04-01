@@ -13,6 +13,12 @@
 packages/
 
 # ─────────────────────────────────────────
+# Solution files
+# ─────────────────────────────────────────
+*.sln
+*.slnx
+
+# ─────────────────────────────────────────
 # IDE & Editor
 # ─────────────────────────────────────────
 .vs/
@@ -32,7 +38,7 @@ logs/
 *.temp
 
 # ─────────────────────────────────────────
-# Database (SQLite — auto-generated at runtime)
+# Database
 # ─────────────────────────────────────────
 *.db
 *.db-shm
@@ -44,6 +50,7 @@ logs/
 # Secrets & Credentials
 # ─────────────────────────────────────────
 appsettings.Development.json
+appsettings.Staging.json
 appsettings.Local.json
 secrets.json
 **/secrets.json
