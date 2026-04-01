@@ -1,6 +1,6 @@
 # TodoApi
 
-A simple REST API for todo management built with **ASP.NET Core 10 Minimal API**, **Entity Framework Core**, and **SQLite**. Includes JWT authentication with refresh token support, API versioning, and rate limiting.
+A REST API for todo management built with **ASP.NET Core 10 Minimal API**, **Entity Framework Core**, and **SQLite**. Includes JWT authentication with refresh token support, API versioning, rate limiting, structured logging, health checks, and a background service for overdue todo reminders.
 
 ---
 
@@ -56,6 +56,8 @@ TodoApi.Web/
 │           ├── CreateTodoDtoValidator.cs
 │           ├── CreateTodoDtoV2Validator.cs
 │           └── UpdateTodoDtoValidator.cs
+├── BackgroundServices/
+│   └── ReminderService.cs                # Hosted service — checks overdue todos periodically
 ├── Extensions/
 │   ├── ServiceCollectionExtensions.cs    # DI extension methods
 │   ├── WebApplicationExtensions.cs       # Middleware & endpoint mapping
@@ -718,7 +720,9 @@ Response `400 Bad Request` (due date in the past):
 
 ### PUT /todos/{id}
 
-All fields are optional (partial update):
+All fields are optional (partial update).
+
+Request body (v1):
 ```json
 {
   "title": "Buy UHT milk",
@@ -726,7 +730,16 @@ All fields are optional (partial update):
 }
 ```
 
-Constraints: title 1–200 characters (if provided).
+Request body (v2 — supports optional `dueDate`):
+```json
+{
+  "title": "Buy UHT milk",
+  "isCompleted": true,
+  "dueDate": "2026-04-10T10:00:00+07:00"
+}
+```
+
+Constraints: title 1–200 characters (if provided). `dueDate` (v2 only): must be in the future if provided.
 
 Response `200 OK`:
 ```json
@@ -843,10 +856,12 @@ Log files are written using a custom `JsonArrayFileSink` that produces valid JSO
 
 ### ReminderService
 
-A hosted background service that runs every **5 minutes** and checks for overdue todos. A todo is considered overdue when:
+A hosted background service that periodically checks for overdue todos. A todo is considered overdue when:
 - `IsCompleted = false`
 - `IsDeleted = false`
 - `DueDate` is set and has passed (compared in UTC)
+
+The check interval is configured via `_interval` in `ReminderService.cs` (default: `TimeSpan.FromSeconds(10)` for development; change to `TimeSpan.FromMinutes(5)` for production).
 
 Overdue todos are logged as warnings:
 
@@ -862,7 +877,7 @@ Since the API validates that `dueDate` must be in the future, insert a test reco
 sqlite3 TodoApi.Web/todos.db "INSERT INTO Todos (Title, IsCompleted, CreatedAt, CreatedBy, UpdatedBy, UpdatedAt, IsDeleted, UserId, DueDate) VALUES ('Overdue Test', 0, datetime('now'), 1, 1, datetime('now'), 0, 1, datetime('now', '-1 hour'));"
 ```
 
-The warning will appear in logs within the next 5-minute check cycle. To speed up testing, temporarily change `_interval` in `ReminderService.cs` to `TimeSpan.FromSeconds(10)`.
+The warning will appear in logs within the next check cycle. To speed up testing, temporarily change `_interval` in `ReminderService.cs` to `TimeSpan.FromSeconds(10)`.
 
 ---
 

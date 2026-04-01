@@ -116,7 +116,8 @@ public static class WebApplicationExtensions
 
         // ==================== VERSION 2 ====================
         var apiV2 = app.MapGroup("/api/v2")
-                        .RequireRateLimiting("v2-ip-limit");
+                        .RequireRateLimiting("v2-ip-limit")
+                        .AddEndpointFilter<LoggingAndPerformanceFilter>();
 
         apiV2.MapAuthEndpointsV2();
         apiV2.MapTodoEndpointsV2();
