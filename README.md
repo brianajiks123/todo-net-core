@@ -14,6 +14,7 @@ A REST API for todo management built with **ASP.NET Core 10 Minimal API**, **Ent
 - AutoMapper 16
 - Swashbuckle (Swagger UI) 7
 - Serilog (structured logging — Console + rolling JSON file)
+- xUnit 2 + Moq + `Microsoft.AspNetCore.Mvc.Testing` (testing)
 
 ## Project Structure
 
@@ -43,7 +44,8 @@ TodoApi.Web/
 │       ├── Dtos.cs                        # Request/Response DTOs
 │       ├── TodoQueryParams.cs             # Query params + PagedResult<T>
 │       ├── Filters/
-│       │   └── ValidationFilter.cs        # FluentValidation endpoint filter
+│       │   ├── ValidationFilter.cs        # FluentValidation endpoint filter
+│       │   └── LoggingAndPerformanceFilter.cs  # Request logging & timing filter (v2)
 │       ├── Mapping/
 │       │   └── TodoProfile.cs             # AutoMapper profile
 │       ├── Repositories/
@@ -70,6 +72,12 @@ TodoApi.Web/
 ├── appsettings.Development.json
 ├── appsettings.Production.json
 └── todos.db                               # SQLite database file (auto-generated)
+
+TodoApi.Web.Tests/
+├── CustomWebApplicationFactory.cs         # WebApplicationFactory with InMemory DB + JWT override
+├── TodoServiceTests.cs                    # Unit tests for TodoService (Moq)
+├── TodoEndpointsIntegrationTests.cs       # Integration tests for auth & todo endpoints
+└── TodoApi.Web.Tests.csproj
 ```
 
 ---
@@ -900,6 +908,53 @@ Unhandled exceptions are returned in [RFC 9457 ProblemDetails](https://www.rfc-e
 In Development mode, the response also includes `exceptionType` to aid debugging.
 
 HTTP error responses (4xx/5xx without an unhandled exception) are returned as `ApiResponse` with a descriptive message.
+
+---
+
+## Testing
+
+Project test berada di `TodoApi.Web.Tests/` dan menggunakan xUnit sebagai test runner.
+
+### Test Stack
+
+| Package | Kegunaan |
+|---------|----------|
+| xUnit 2 | Test runner & assertions |
+| Moq | Mocking dependencies untuk unit tests |
+| `Microsoft.AspNetCore.Mvc.Testing` | `WebApplicationFactory` untuk integration tests |
+| `Microsoft.EntityFrameworkCore.InMemory` | In-memory database untuk integration tests |
+
+### Menjalankan Tests
+
+```bash
+dotnet test TodoApi.Web.Tests
+```
+
+### Unit Tests — `TodoServiceTests`
+
+Menguji `TodoService` secara terisolasi menggunakan mock `IUnitOfWork` dan `IMapper`.
+
+| Test | Deskripsi |
+|------|-----------|
+| `CreateV2_Should_Create_Todo_And_Return_ResponseDto` | Verifikasi todo dibuat dan `SaveChangesAsync` dipanggil sekali |
+| `GetById_Should_Return_Null_When_Todo_Not_Found` | Verifikasi return `null` jika todo tidak ditemukan |
+
+### Integration Tests — `TodoEndpointsIntegrationTests`
+
+Menguji endpoint secara end-to-end menggunakan `CustomWebApplicationFactory` yang mengganti SQLite dengan EF Core InMemory database.
+
+| Test | Deskripsi |
+|------|-----------|
+| `HealthCheck_Returns_Healthy_Status` | `GET /api/v2/health` mengembalikan status `Healthy` |
+| `Full_Auth_And_Todo_Flow_Works` | Register → Login → Create Todo menggunakan JWT |
+
+### CustomWebApplicationFactory
+
+`CustomWebApplicationFactory` melakukan tiga hal saat setup:
+
+1. Mengganti `TodoDbContext` (SQLite) dengan EF Core InMemory database menggunakan `InMemoryDatabaseRoot` bersama — memastikan semua scope dalam satu factory instance menggunakan store yang sama.
+2. Meng-override konfigurasi JWT (`Jwt:Secret`, issuer, audience) via `ConfigureAppConfiguration`.
+3. Meng-override `JwtBearerOptions` via `PostConfigureAll` — karena `AddJwtBearer` membaca `IConfiguration` saat startup (sebelum override test diterapkan), signing key perlu di-patch agar validasi token konsisten dengan token yang di-generate.
 
 ---
 
